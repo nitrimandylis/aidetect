@@ -1,0 +1,17 @@
+# personal drafts — never publish my own essays
+EE-clean.txt
+*.docx
+*-clean.txt
+
+# second-opinion tool is an external repo, not mine to redistribute
+fast-ai-detector/
+
+.DS_Store
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# huggingface model cache
+.cache/
