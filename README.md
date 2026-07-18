@@ -57,6 +57,7 @@ reminder: directional only, not a Turnitin score.
 | 03 | **prose extractor** | `extract.py` strips headings, bullets, footnotes and your own note-scaffolding first, so the score is about writing, not structure |
 | 04 | **offline after setup** | first run pulls ~1.5GB of model, every run after is airgapped — your essay never leaves the laptop |
 | 05 | **second opinion** | cross-check against the lighter [Ejhfast/fast-ai-detector] when one model's paranoia isn't enough |
+| 06 | **Binoculars (shelved)** | a training-free perplexity-ratio detector — tried, measured, and parked; see below for why it doesn't work on an 18GB Mac |
 
 ## 🚀 Run it
 
@@ -89,7 +90,33 @@ flowchart LR
 |---|---|
 | `detect.py` | loads the desklib model, scores each paragraph, prints the bars and flags |
 | `extract.py` | pulls clean prose out of a `.docx` into a `.txt` — drops headings, bullets, note-labels |
+| `binoculars.py` | training-free perplexity-ratio scorer over a base+instruct LM pair (shelved, see below) |
+| `calibrate.py` | scores the labelled `calibration/` set, finds the threshold, then checks a draft |
+| `test_binoculars.py` | math + threshold self-checks, no model download |
 | `requirements.txt` | torch · transformers · python-docx |
+
+## 🔭 Binoculars: tried, measured, shelved
+
+[Binoculars](https://arxiv.org/abs/2401.12070) is a training-free detector: run
+text through two LMs that share a tokenizer (a base "observer" and an instruct
+"performer") and divide perplexity by cross-perplexity. Its designed model pair
+is Falcon-7B ×2 (~28GB) — too big for an 18GB Mac. So I swapped in a small
+same-family pair (Qwen2.5-0.5B, or 1.5B) that fits.
+
+Then I actually measured it. `calibrate.py` scores a labelled set — 12 real
+pre-2020 IB Extended Essay paragraphs vs 12 LLM-written ones on the same topics
+— and finds the best separating threshold:
+
+| pair | best separation | chance |
+|---|---|---|
+| Qwen2.5-0.5B | 62% | 50% |
+| Qwen2.5-1.5B | 67% | 50% |
+
+Barely above a coin flip. The human and AI score clusters almost completely
+overlap, because the perplexity gap Binoculars exploits is sharp in 7B models
+and mush in sub-2B ones. **It's kept as a documented negative result, not a
+detector to trust.** desklib stays the primary. Run `python calibrate.py` to
+reproduce the numbers.
 
 **Stack:** python · pytorch · transformers · desklib DeBERTa
 

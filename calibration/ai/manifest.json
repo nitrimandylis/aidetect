@@ -1,0 +1,74 @@
+[
+  {
+    "id": "a01",
+    "matches": "h01",
+    "subject": "English",
+    "topic": "Jane Austen's use of the outdoors in Emma and what it reveals about characters"
+  },
+  {
+    "id": "a02",
+    "matches": "h02",
+    "subject": "English",
+    "topic": "Marlowe's Dr. Faustus, the morality-play tradition and attitudes to spirituality"
+  },
+  {
+    "id": "a03",
+    "matches": "h03",
+    "subject": "History",
+    "topic": "Socio-political context of the Dreyfus Affair in 1890s France"
+  },
+  {
+    "id": "a04",
+    "matches": "h04",
+    "subject": "History",
+    "topic": "How early football in Costa Rica served government social control and national identity"
+  },
+  {
+    "id": "a05",
+    "matches": "h05",
+    "subject": "Biology",
+    "topic": "Circadian rhythms and internal biological clocks as background to a hamster experiment"
+  },
+  {
+    "id": "a06",
+    "matches": "h06",
+    "subject": "Biology",
+    "topic": "Behaviour and territoriality of the freshwater prawn Macrobrachium rosenbergii"
+  },
+  {
+    "id": "a07",
+    "matches": "h07",
+    "subject": "Physics",
+    "topic": "Locating the centre of mass as a step in analysing maximum braking on a bicycle"
+  },
+  {
+    "id": "a08",
+    "matches": "h08",
+    "subject": "Physics",
+    "topic": "Using an ultrasonic motion detector to measure a cylinder rolling down an incline"
+  },
+  {
+    "id": "a09",
+    "matches": "h09",
+    "subject": "Geography",
+    "topic": "Why remoteness only partly explains low retention of indigenous students in Queensland"
+  },
+  {
+    "id": "a10",
+    "matches": "h10",
+    "subject": "Psychology",
+    "topic": "Definition and prevalence of hate crimes and harassment against LGBT youth"
+  },
+  {
+    "id": "a11",
+    "matches": "h11",
+    "subject": "Philosophy",
+    "topic": "The interdependence of the Apollonian and Dionysian in Nietzsche's dualism"
+  },
+  {
+    "id": "a12",
+    "matches": "h12",
+    "subject": "Economics",
+    "topic": "Price competition among restaurants under monopolistic competition (Centro, Oberhausen)"
+  }
+]

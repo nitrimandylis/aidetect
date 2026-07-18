@@ -1,0 +1,12 @@
+{
+  "pair": [
+    "Qwen/Qwen2.5-1.5B",
+    "Qwen/Qwen2.5-1.5B-Instruct"
+  ],
+  "threshold": 0.9777,
+  "accuracy": 0.6667,
+  "n_human": 12,
+  "n_ai": 12,
+  "human_mean": 1.0185,
+  "ai_mean": 0.9891
+}
