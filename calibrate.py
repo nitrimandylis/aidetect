@@ -9,7 +9,7 @@ then scores a real draft with that cutoff.
 
     python calibrate.py                 # calibrate + check EE-clean.txt
     python calibrate.py path/to/IA.txt  # calibrate + check that file too
-    python calibrate.py --big           # use the 1.5B pair
+    python calibrate.py --pair big      # use the 1.5B pair
 """
 
 import argparse
@@ -17,8 +17,8 @@ import glob
 import json
 import os
 
-from binoculars import load_pair, load_pair_mlx, score_text, pick_device, PAIRS, MLX_PAIRS
-from detect import read_paragraphs, bar
+from binoculars import add_backend_args, load_backend, report, score_text, PAIRS, MLX_PAIRS
+from detect import read_paragraphs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CAL_DIR = os.path.join(HERE, "calibration")
@@ -62,25 +62,10 @@ def main():
     ap = argparse.ArgumentParser(description="Calibrate Binoculars threshold, then check a draft.")
     ap.add_argument("path", nargs="?", default=os.path.join(HERE, "EE-clean.txt"),
                     help="draft to check after calibrating (default EE-clean.txt)")
-    ap.add_argument("--big", action="store_true", help="use the 1.5B pair")
-    ap.add_argument("--pair", choices=list(PAIRS), default="small",
-                    help="model pair to use (default %(default)s)")
-    ap.add_argument("--mlx", action="store_true",
-                    help="use the 4-bit MLX gemma pair (Apple Silicon; needs mlx-vlm)")
+    add_backend_args(ap)
     args = ap.parse_args()
 
-    pair_key = "big" if args.big else args.pair
-    if args.mlx:
-        if pair_key not in MLX_PAIRS:
-            ap.error(f"--mlx only supports {list(MLX_PAIRS)}; pass e.g. --pair gemma")
-        backend, device = "mlx", None
-        print(f"loading MLX pair {' + '.join(MLX_PAIRS[pair_key])}...")
-        tokenizer, observer, performer = load_pair_mlx(pair_key)
-    else:
-        backend = "torch"
-        device = pick_device()
-        print(f"loading {' + '.join(PAIRS[pair_key])} on {device}...")
-        tokenizer, observer, performer = load_pair(pair_key, device)
+    pair_key, backend, device, tokenizer, observer, performer = load_backend(args)
 
     # --- score the labelled set ---
     human = score_folder(os.path.join(CAL_DIR, "human"), tokenizer, observer, performer, device, backend)
@@ -120,21 +105,7 @@ def main():
 
     # --- run the calibrated check on the draft ---
     print(f"\n=== checking {os.path.relpath(args.path, HERE)} with threshold {cutoff:.3f} ===")
-    paras = read_paragraphs(args.path)
-    if not paras:
-        print("no scorable paragraphs found.")
-        return
-    scores = []
-    for i, para in enumerate(paras, 1):
-        s = score_text(para, tokenizer, observer, performer, device, backend)
-        scores.append(s)
-        flag = "  <-- AI-ish" if s < cutoff else ""
-        aiish = max(0.0, min(1.0, (cutoff * 1.3 - s) / (cutoff * 1.3)))
-        print(f"P{i:>3}  {s:5.3f}  [{bar(aiish)}]{flag}")
-        print(f"      {para[:70].strip()}...")
-    flagged = sum(s < cutoff for s in scores)
-    print("-" * 60)
-    print(f"average score: {sum(scores)/len(scores):.3f}   |   {flagged}/{len(scores)} paragraphs flagged (< {cutoff:.3f})")
+    report(read_paragraphs(args.path), cutoff, tokenizer, observer, performer, device, backend)
 
 
 if __name__ == "__main__":

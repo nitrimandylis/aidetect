@@ -21,7 +21,7 @@ why this was shelved as a negative result. A Gemma 4 pair fixes that: it hits
 
     python binoculars.py path/to/draft.docx
     python binoculars.py notes.txt --text "some sentence to score"
-    python binoculars.py notes.txt --big              # bigger Qwen pair
+    python binoculars.py notes.txt --pair big         # bigger Qwen pair
     python binoculars.py notes.txt --mlx --pair gemma # Gemma 4 E2B on a Mac
 
 Threshold: the AI/human boundary is PER MODEL PAIR. If calibrate.py has saved a
@@ -37,7 +37,7 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from detect import read_paragraphs, bar, MIN_WORDS
+from detect import read_paragraphs, bar, MIN_WORDS, pick_device
 
 # Same-tokenizer pairs. base = observer, instruct = performer.
 # Gemma 4 is Apache-2 (no HF gate). E2B is the smallest but ~5B raw params each,
@@ -61,12 +61,6 @@ MAX_LEN = 1024        # token window; longer paragraphs get truncated
 # ponytail: Falcon's tuned boundary as a placeholder. Wrong for our pair —
 # recalibrate on known-human text. Lower score = more AI-like.
 DEFAULT_THRESHOLD = 0.90
-
-
-def pick_device():
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
 
 
 def load_saved_threshold(pair_key, backend):
@@ -109,6 +103,30 @@ def load_pair_mlx(pair_key):
     performer, _ = load(perf_repo)
     tokenizer = getattr(processor, "tokenizer", processor)
     return tokenizer, observer, performer
+
+
+def add_backend_args(ap):
+    """The --pair/--mlx flags, shared by binoculars.py and calibrate.py."""
+    ap.add_argument("--pair", choices=list(PAIRS), default="small",
+                    help="model pair to use (default %(default)s)")
+    ap.add_argument("--mlx", action="store_true",
+                    help="use the 4-bit MLX gemma pair (Apple Silicon; needs mlx-vlm)")
+
+
+def load_backend(args):
+    """Turn parsed CLI args into a loaded model pair.
+    Returns (pair_key, backend, device, tokenizer, observer, performer)."""
+    pair_key = args.pair
+    if args.mlx:
+        if pair_key not in MLX_PAIRS:
+            raise SystemExit(f"--mlx only supports {list(MLX_PAIRS)}; pass e.g. --pair gemma")
+        print(f"loading MLX pair {' + '.join(MLX_PAIRS[pair_key])}...")
+        tokenizer, observer, performer = load_pair_mlx(pair_key)
+        return pair_key, "mlx", None, tokenizer, observer, performer
+    device = pick_device()
+    print(f"loading {' + '.join(PAIRS[pair_key])} on {device}... (first run downloads the models)")
+    tokenizer, observer, performer = load_pair(pair_key, device)
+    return pair_key, "torch", device, tokenizer, observer, performer
 
 
 def _mlx_logits(model, ids):
@@ -188,11 +206,7 @@ def main():
     ap = argparse.ArgumentParser(description="Binoculars AI-text detector (second opinion).")
     ap.add_argument("path", nargs="?", help=".docx or .txt file to score")
     ap.add_argument("--text", help="score a single string instead of a file")
-    ap.add_argument("--pair", choices=list(PAIRS), default="small",
-                    help="model pair to use (default %(default)s)")
-    ap.add_argument("--big", action="store_true", help="alias for --pair big")
-    ap.add_argument("--mlx", action="store_true",
-                    help="use the 4-bit MLX gemma pair (Apple Silicon; needs mlx-vlm)")
+    add_backend_args(ap)
     ap.add_argument("--threshold", type=float, default=None,
                     help="flag paragraphs below this (default: calibrated pair threshold, else %s)"
                          % DEFAULT_THRESHOLD)
@@ -201,18 +215,7 @@ def main():
     if not args.path and not args.text:
         ap.error("give a file path or --text")
 
-    pair_key = "big" if args.big else args.pair
-    if args.mlx:
-        if pair_key not in MLX_PAIRS:
-            ap.error(f"--mlx only supports {list(MLX_PAIRS)}; pass e.g. --pair gemma")
-        backend, device = "mlx", None
-        print(f"loading MLX pair {' + '.join(MLX_PAIRS[pair_key])}...")
-        tokenizer, observer, performer = load_pair_mlx(pair_key)
-    else:
-        backend = "torch"
-        device = pick_device()
-        print(f"loading {' + '.join(PAIRS[pair_key])} on {device}... (first run downloads the models)")
-        tokenizer, observer, performer = load_pair(pair_key, device)
+    pair_key, backend, device, tokenizer, observer, performer = load_backend(args)
 
     # explicit --threshold wins; else use the calibrated one; else Falcon's placeholder
     threshold = args.threshold
