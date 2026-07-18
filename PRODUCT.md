@@ -11,12 +11,11 @@ whether my prose reads as AI-generated *before* a teacher runs Turnitin.
   to cross-check. Its own CLI: `fast-ai-detector --text "..."`.
 - `binoculars.py` — a third, training-free scorer (base + instruct LM pair,
   perplexity ÷ cross-perplexity). `calibrate.py` finds the threshold from the
-  labelled set in `calibration/`. **Verdict: doesn't work at this scale.**
-  Measured on 12 real pre-2020 EEs vs 12 LLM-written paragraphs, the Qwen
-  0.5B pair separates only 62%, the 1.5B pair 67% — barely above chance (50%).
-  Binoculars needs the 7B pair it was designed for; sub-2B models don't have a
-  sharp enough perplexity gap. Kept as a documented negative result, not a
-  detector you should trust. desklib stays primary.
+  labelled set in `calibration/`. Shelved with the Qwen pairs (62–67% on the
+  labelled set, near chance) but **revived by Gemma 4**: the E2B pair separates
+  the same set at 96%. Gemma 4 is a multimodal checkpoint, so `--mlx` loads it
+  4-bit via mlx-vlm and runs it text-only, fitting an 18GB Mac in ~6GB. desklib
+  stays primary; Binoculars is now a usable second opinion rather than a dead end.
 
 ## How to run
 ```bash
@@ -24,12 +23,14 @@ conda activate ai-detect
 python detect.py "path/to/draft.docx"
 python detect.py --text "one sentence"
 fast-ai-detector --text "one sentence"   # the second opinion
-python binoculars.py "path/to/draft.docx" # training-free third opinion
+python binoculars.py "path/to/draft.docx"       # training-free, Qwen pair
+python binoculars.py "path/to/draft.docx" --mlx --pair gemma  # Gemma 4, 96% on the set
 ```
 
 ## Honest limits
 - Runs on 18GB Mac (Apple Silicon MPS). Binoculars' *default* Falcon-7B pair
-  (~28GB) won't fit, so we run a small Qwen2.5 pair instead. Fast-DetectGPT skipped.
+  (~28GB) won't fit; the Qwen pairs fit but barely separate, and the Gemma 4
+  MLX pair is the one that actually works. Fast-DetectGPT skipped.
 - Directional only. A high score means "reword this," not "you'll get caught."
   It is not, and cannot be, the Turnitin number a teacher sees.
 

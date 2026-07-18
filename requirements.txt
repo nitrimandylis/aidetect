@@ -1,3 +1,6 @@
 torch
 transformers
 python-docx
+
+# optional, Apple Silicon only: enables `binoculars.py --mlx` (Gemma 4 is a VLM checkpoint)
+# mlx-vlm

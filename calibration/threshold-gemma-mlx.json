@@ -1,0 +1,13 @@
+{
+  "pair": [
+    "google/gemma-4-E2B",
+    "mlx-community/gemma-4-e2b-it-qat-OptiQ-4bit"
+  ],
+  "backend": "mlx",
+  "threshold": 0.8264,
+  "accuracy": 0.9583,
+  "n_human": 12,
+  "n_ai": 12,
+  "human_mean": 0.9005,
+  "ai_mean": 0.7126
+}

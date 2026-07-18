@@ -17,14 +17,14 @@ import glob
 import json
 import os
 
-from binoculars import load_pair, score_text, pick_device, PAIRS
+from binoculars import load_pair, load_pair_mlx, score_text, pick_device, PAIRS, MLX_PAIRS
 from detect import read_paragraphs, bar
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CAL_DIR = os.path.join(HERE, "calibration")
 
 
-def score_folder(folder, tokenizer, observer, performer, device):
+def score_folder(folder, tokenizer, observer, performer, device, backend="torch"):
     """Score every .txt in a folder. Returns list of (id, score)."""
     out = []
     for path in sorted(glob.glob(os.path.join(folder, "*.txt"))):
@@ -32,7 +32,7 @@ def score_folder(folder, tokenizer, observer, performer, device):
         if not text:
             continue
         sid = os.path.splitext(os.path.basename(path))[0]
-        out.append((sid, score_text(text, tokenizer, observer, performer, device)))
+        out.append((sid, score_text(text, tokenizer, observer, performer, device, backend)))
     return out
 
 
@@ -63,16 +63,28 @@ def main():
     ap.add_argument("path", nargs="?", default=os.path.join(HERE, "EE-clean.txt"),
                     help="draft to check after calibrating (default EE-clean.txt)")
     ap.add_argument("--big", action="store_true", help="use the 1.5B pair")
+    ap.add_argument("--pair", choices=list(PAIRS), default="small",
+                    help="model pair to use (default %(default)s)")
+    ap.add_argument("--mlx", action="store_true",
+                    help="use the 4-bit MLX gemma pair (Apple Silicon; needs mlx-vlm)")
     args = ap.parse_args()
 
-    pair_key = "big" if args.big else "small"
-    device = pick_device()
-    print(f"loading {' + '.join(PAIRS[pair_key])} on {device}...")
-    tokenizer, observer, performer = load_pair(pair_key, device)
+    pair_key = "big" if args.big else args.pair
+    if args.mlx:
+        if pair_key not in MLX_PAIRS:
+            ap.error(f"--mlx only supports {list(MLX_PAIRS)}; pass e.g. --pair gemma")
+        backend, device = "mlx", None
+        print(f"loading MLX pair {' + '.join(MLX_PAIRS[pair_key])}...")
+        tokenizer, observer, performer = load_pair_mlx(pair_key)
+    else:
+        backend = "torch"
+        device = pick_device()
+        print(f"loading {' + '.join(PAIRS[pair_key])} on {device}...")
+        tokenizer, observer, performer = load_pair(pair_key, device)
 
     # --- score the labelled set ---
-    human = score_folder(os.path.join(CAL_DIR, "human"), tokenizer, observer, performer, device)
-    ai = score_folder(os.path.join(CAL_DIR, "ai"), tokenizer, observer, performer, device)
+    human = score_folder(os.path.join(CAL_DIR, "human"), tokenizer, observer, performer, device, backend)
+    ai = score_folder(os.path.join(CAL_DIR, "ai"), tokenizer, observer, performer, device, backend)
     human_scores = [s for _, s in human]
     ai_scores = [s for _, s in ai]
 
@@ -90,8 +102,10 @@ def main():
     print("    flag as AI-ish when score < threshold")
 
     # save for reuse / future recalibration
+    active_pairs = MLX_PAIRS if backend == "mlx" else PAIRS
     out = {
-        "pair": PAIRS[pair_key],
+        "pair": active_pairs[pair_key],
+        "backend": backend,
         "threshold": round(cutoff, 4),
         "accuracy": round(acc, 4),
         "n_human": len(human),
@@ -99,7 +113,8 @@ def main():
         "human_mean": round(sum(human_scores)/len(human_scores), 4),
         "ai_mean": round(sum(ai_scores)/len(ai_scores), 4),
     }
-    thr_path = os.path.join(CAL_DIR, f"threshold-{pair_key}.json")
+    tag = f"{pair_key}-mlx" if backend == "mlx" else pair_key
+    thr_path = os.path.join(CAL_DIR, f"threshold-{tag}.json")
     json.dump(out, open(thr_path, "w"), indent=2)
     print(f"    saved -> {os.path.relpath(thr_path, HERE)}")
 
@@ -111,7 +126,7 @@ def main():
         return
     scores = []
     for i, para in enumerate(paras, 1):
-        s = score_text(para, tokenizer, observer, performer, device)
+        s = score_text(para, tokenizer, observer, performer, device, backend)
         scores.append(s)
         flag = "  <-- AI-ish" if s < cutoff else ""
         aiish = max(0.0, min(1.0, (cutoff * 1.3 - s) / (cutoff * 1.3)))
