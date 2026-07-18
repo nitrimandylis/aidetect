@@ -1,0 +1,1 @@
+As we can see in the diagram above, the motion detector is placed on the edge of the board in order to collect measurements along and down the plane. It is an ultrasonic device that works by sending waves and collecting the reflection of those waves off surfaces in its line of action. It then processes this information and records a displacement value for the cylinder.

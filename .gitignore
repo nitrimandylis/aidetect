@@ -3,10 +3,6 @@ EE-clean.txt
 *.docx
 *-clean.txt
 
-# calibration human samples are copyrighted IBO exemplar text — keep local for
-# recalibration, don't republish. Manifest (provenance only) is fine to commit.
-calibration/human/*.txt
-
 # second-opinion tool is an external repo, not mine to redistribute
 fast-ai-detector/
 
