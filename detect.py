@@ -28,6 +28,10 @@ MIN_WORDS = 25         # ponytail: skip fragments; short text scores as noise
 # It's a normal transformer with mean-pooling + a 1-unit classifier head.
 class DesklibAIDetectionModel(PreTrainedModel):
     config_class = AutoConfig
+    # transformers 5.x reads this during from_pretrained; the model has no tied
+    # weights (encoder + linear head), so an empty mapping is correct. Without it,
+    # loading raises AttributeError on 5.x. ponytail: needed once mlx pulled 5.x in.
+    all_tied_weights_keys = {}
 
     def __init__(self, config):
         super().__init__(config)
