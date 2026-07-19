@@ -44,7 +44,16 @@ def main():
         sys.exit("usage: python extract.py in.docx out.txt")
     in_path, out_path = sys.argv[1], sys.argv[2]
     doc = docx.Document(in_path)
-    prose = [p.text.strip() for p in doc.paragraphs if is_prose(p)]
+    prose = []
+    for p in doc.paragraphs:
+        # Bibliography is the last section; once its heading shows up, the rest
+        # is citations, not prose. Stop here.
+        if p.style.name.startswith("Heading") and p.text.strip().lower() in (
+            "bibliography", "works cited", "references",
+        ):
+            break
+        if is_prose(p):
+            prose.append(p.text.strip())
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n\n".join(prose))
     words = sum(len(p.split()) for p in prose)
