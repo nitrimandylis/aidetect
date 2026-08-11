@@ -131,6 +131,41 @@ desklib stays the primary detector; Binoculars is now a usable second opinion
 rather than a dead end. Run `python calibrate.py` (add `--mlx --pair gemma`) to
 reproduce the numbers.
 
+## 🧪 The peer set: genre context, not a human class
+
+The 12 human samples are Extended Essays: English, History, Biology, Physics,
+Philosophy. A CS IA is a different animal, all database schemas, GUI components and
+method-by-method justification, and technical prose is inherently more
+predictable token-by-token, which drags perplexity-ratio scores down no matter
+who typed it. So a CS IA scoring below the EE human mean means less than it
+looks.
+
+`calibration/peer/` holds 12 paragraphs of real IB Computer Science IA prose
+(5 projects, 5 authors: sudokuMaster, IBOrganizer, MyCalendar, and two
+IBO-published new-syllabus specimens). Measured against the same anchors:
+
+| set | Binoculars mean | desklib mean |
+|---|---|---|
+| human (2008 EEs, verified pre-2020) | **0.90** | n/a |
+| **peer (CS IAs, 2021–2025)** | **0.85** | **0.46** |
+| ai (LLM-written, matched topics) | **0.71** | n/a |
+
+The genre gap is real and it is about 0.05 on Binoculars. Score your IA against
+`peer`, not against `human`.
+
+**It is not a human class and it never fits a threshold.** Every source
+postdates ChatGPT; three of the five were written in 2025. None carries an
+authorship attestation, and in 2025 a fair share of student IAs were not
+written unaided. Fold that into `human/` and any AI-assisted sample drags the
+mean down, lowers the threshold, and the tool starts clearing drafts for the
+wrong reason, a detector that reassures instead of measures. `calibrate.py`
+globs only `calibration/human` and `calibration/ai`, so `peer/` stays out of
+threshold fitting by construction, not by discipline.
+
+What it can tell you: *"my prose scores like other IAs in this genre."* What it
+can never tell you: *"my prose is human."* Matching a set you cannot vouch for
+proves you are not an outlier, nothing more.
+
 **Stack:** python · pytorch · transformers · desklib DeBERTa
 
 The lighter cross-check tool lives at [Ejhfast/fast-ai-detector] — it's a

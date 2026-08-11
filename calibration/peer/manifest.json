@@ -1,0 +1,141 @@
+{
+  "_about": "Peer reference set: IB Computer Science IA prose, same genre as the drafts this tool checks (technical documentation, database and GUI description, success-criteria evaluation). Exists because calibration/human is 12 humanities and science Extended Essays, which is the wrong genre for a CS IA and plausibly depresses Binoculars scores on technical writing regardless of authorship.",
+  "_provenance_warning": "NONE of these samples can be certified human-written. Every source postdates the public release of ChatGPT (Nov 2022); three of the five were authored in 2025. They are NOT a human class and MUST NOT be used to fit a threshold. Doing so would let AI-assisted text pull the human mean down and make the detector clear a draft for the wrong reason.",
+  "_usage": "Comparison only. calibrate.py globs calibration/human and calibration/ai and does not read this folder, so no code change is needed to keep it out of threshold fitting. Score it to answer 'how does my prose sit next to other IAs in this genre?', never 'am I clean?'.",
+  "provenance": "unverified",
+  "excluded_from_threshold": true,
+  "samples": [
+    {
+      "id": "p01",
+      "source": "examples/IBOrganizer/Forms/Documentation/criterionA.docx",
+      "paragraph": 13,
+      "project": "IBOrganizer (task and test-score tracker, Java + SQL)",
+      "section": "Criterion A, computational context",
+      "topic": "Justifying Java over Python and SQL for relational data",
+      "syllabus": "old",
+      "date_evidence": "docx core.xml dcterms:created 2025-01-14T15:40:00Z, dcterms:modified 2025-03-29T11:35:00Z, cp:revision 11. Post-LLM. School exemplar, not IBO-published.",
+      "provenance": "unverified"
+    },
+    {
+      "id": "p02",
+      "source": "examples/IBOrganizer/Forms/Documentation/criterionC.docx",
+      "paragraph": 55,
+      "project": "IBOrganizer (task and test-score tracker, Java + SQL)",
+      "section": "Criterion C, techniques",
+      "topic": "JDBC account creation, duplicate checks, RETURN_GENERATED_KEYS",
+      "syllabus": "old",
+      "date_evidence": "Same document set as p01. docx created 2025. Post-LLM.",
+      "provenance": "unverified"
+    },
+    {
+      "id": "p03",
+      "source": "examples/IBOrganizer/Forms/Documentation/criterionC.docx",
+      "paragraph": 61,
+      "project": "IBOrganizer (task and test-score tracker, Java + SQL)",
+      "section": "Criterion C, techniques",
+      "topic": "JDBC storage and retrieval of test records via ResultSet",
+      "syllabus": "old",
+      "date_evidence": "Same document set as p01. docx created 2025. Post-LLM.",
+      "provenance": "unverified"
+    },
+    {
+      "id": "p04",
+      "source": "examples/MyCalendar/Documentation/Criterion A.docx",
+      "paragraph": 5,
+      "project": "MyCalendar (calendar and task manager, Java + SQL)",
+      "section": "Criterion A, problem scenario",
+      "topic": "Client scenario, an IB student missing deadlines",
+      "syllabus": "old",
+      "date_evidence": "docx core.xml dcterms:created 2025-01-30T18:27:00Z, dcterms:modified 2025-03-31T09:44:23Z, cp:revision 28. Post-LLM. School exemplar, not IBO-published.",
+      "provenance": "unverified"
+    },
+    {
+      "id": "p05",
+      "source": "examples/MyCalendar/Documentation/Criterion B.docx",
+      "paragraph": 396,
+      "project": "MyCalendar (calendar and task manager, Java + SQL)",
+      "section": "Criterion B, data structures",
+      "topic": "ArrayList, what it is and how the calendar uses it",
+      "syllabus": "old",
+      "date_evidence": "Same document set as p04. docx created 2025. Post-LLM.",
+      "provenance": "unverified"
+    },
+    {
+      "id": "p06",
+      "source": "examples/MyCalendar/Documentation/Criterion C .docx",
+      "paragraph": 91,
+      "project": "MyCalendar (calendar and task manager, Java + SQL)",
+      "section": "Criterion C, techniques",
+      "topic": "Duplicate username and email checks on account creation, traced to success criteria",
+      "syllabus": "old",
+      "date_evidence": "Same document set as p04. docx created 2025. Post-LLM.",
+      "provenance": "unverified"
+    },
+    {
+      "id": "p07",
+      "source": "examples/Forms/Documentation/criterionC.pdf",
+      "paragraph": 23,
+      "project": "sudokuMaster (Sudoku game, Java Swing + MySQL)",
+      "section": "Criterion C, GUI",
+      "topic": "JTable subclassing for saved-games and high-score lists",
+      "syllabus": "old",
+      "date_evidence": "PDF Producer pdfTeX-1.40.22, Creator 'LaTeX with hyperref'. pdfTeX 1.40.22 shipped with TeX Live 2021 (Apr 2021) and remained current for several releases, so this is 2021 at the earliest and NOT datable to before ChatGPT. No copyright line, no archive capture, no CreationDate recovered.",
+      "provenance": "unverified"
+    },
+    {
+      "id": "p08",
+      "source": "examples/Forms/Documentation/criterionC.pdf",
+      "paragraph": 26,
+      "project": "sudokuMaster (Sudoku game, Java Swing + MySQL)",
+      "section": "Criterion C, GUI",
+      "topic": "Rendering the 9x9 board from a database string, 3x3 subgrids",
+      "syllabus": "old",
+      "date_evidence": "Same document set as p07. Not datable to before ChatGPT.",
+      "provenance": "unverified"
+    },
+    {
+      "id": "p09",
+      "source": "examples/Forms/Documentation/criterionC.pdf",
+      "paragraph": 108,
+      "project": "sudokuMaster (Sudoku game, Java Swing + MySQL)",
+      "section": "Criterion C, algorithms",
+      "topic": "Quicksort over generic ArrayLists with a custom compare method",
+      "syllabus": "old",
+      "date_evidence": "Same document set as p07. Not datable to before ChatGPT.",
+      "provenance": "unverified"
+    },
+    {
+      "id": "p10",
+      "source": "examples/new_syllabus (NOT VERY GOOD)/carManagementSystem/DP_Comp_sci_asw_example_4_en.pdf",
+      "paragraph": 136,
+      "project": "carManagementSystem (dealership records, Python + Tkinter + SQLite)",
+      "section": "Criterion D, techniques and testing",
+      "topic": "Parameterised INSERT, SQL injection, context-manager transactions",
+      "syllabus": "new",
+      "date_evidence": "IBO-published specimen for the new syllabus (first assessment 2027), so authored 2024-2025. Post-LLM. Vetted by IBO as a candidate sample but carries no authorship attestation.",
+      "provenance": "unverified"
+    },
+    {
+      "id": "p11",
+      "source": "examples/new_syllabus (NOT VERY GOOD)/chatRoom/DP_Comp_sci_asw_example_3_en.pdf",
+      "paragraph": 113,
+      "project": "chatRoom (decentralised chat, Java Swing + Sockets)",
+      "section": "Criterion D, techniques and testing",
+      "topic": "Client socket connection, reader/writer threads, exception path on server close",
+      "syllabus": "new",
+      "date_evidence": "IBO-published specimen for the new syllabus (first assessment 2027), so authored 2024-2025. Post-LLM.",
+      "provenance": "unverified"
+    },
+    {
+      "id": "p12",
+      "source": "examples/new_syllabus (NOT VERY GOOD)/chatRoom/DP_Comp_sci_asw_example_3_en.pdf",
+      "paragraph": 123,
+      "project": "chatRoom (decentralised chat, Java Swing + Sockets)",
+      "section": "Criterion E, improvements",
+      "topic": "Port forwarding and UPnP, UI polish, host-side access control",
+      "syllabus": "new",
+      "date_evidence": "IBO-published specimen for the new syllabus (first assessment 2027), so authored 2024-2025. Post-LLM.",
+      "provenance": "unverified"
+    }
+  ]
+}
