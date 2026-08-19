@@ -69,6 +69,55 @@ def test_sections_quotes_tables_and_bibliography(tmp_path="/tmp"):
     os.remove(path)
 
 
+def run_cli(args):
+    """Run the real entry point in a subprocess. Returns (rc, stdout, stderr).
+    In-process would not catch the two things worth checking: the exit code and
+    whether anything else leaked onto stdout."""
+    import subprocess
+    src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+    env = dict(os.environ, PYTHONPATH=src)
+    p = subprocess.run([sys.executable, "-c", "import sys; from aidetect.cli import main; sys.exit(main() or 0)",
+                        *args], env=env, capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+
+def test_json_is_the_only_thing_on_stdout():
+    import json
+    path = "/tmp/aidetect-json-fixture.docx"
+    build_fixture(path)
+    rc, out, _ = run_cli(["count", path, "--limit", "10", "--json"])
+    assert rc == 0, rc
+    payload = json.loads(out)          # fails if a banner or a warning got in
+    assert payload == {
+        "sections": [{"title": "Introduction", "words": 7},
+                     {"title": "Analysis", "words": 5}],
+        "total": 12,
+        "limit": 10,
+        "over": 2,
+    }, payload
+    os.remove(path)
+
+
+def test_json_keys_stay_present_without_a_limit():
+    # null means "does not apply"; the key is never dropped.
+    import json
+    path = "/tmp/aidetect-json-nolimit.docx"
+    build_fixture(path)
+    _, out, _ = run_cli(["count", path, "--json"])
+    payload = json.loads(out)
+    assert payload["limit"] is None and payload["over"] is None, payload
+    os.remove(path)
+
+
+def test_bad_flag_and_bad_input_exit_nonzero():
+    # An unknown flag must be an error, not a silent shrug, and a .txt must not
+    # be counted as if it were a draft.
+    rc, _, _ = run_cli(["count", "whatever.docx", "--bogus"])
+    assert rc != 0, "unknown flag exited 0"
+    rc, _, err = run_cli(["count", "notes.txt"])
+    assert rc != 0 and "docx" in err, (rc, err)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

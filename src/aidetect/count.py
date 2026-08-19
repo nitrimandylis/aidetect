@@ -14,9 +14,11 @@ Excluded, per the IB rules that are common to the EE and the subject IAs:
 
     aidetect count draft.docx
     aidetect count draft.docx --limit 4000
+    aidetect count draft.docx --limit 4000 --json
 """
 
 import argparse
+import json
 import re
 
 from .text import is_end_heading, is_heading, is_prose
@@ -79,18 +81,37 @@ def report(sections, total, limit):
           "citations and everything from the bibliography on.")
 
 
+def as_json(sections, total, limit):
+    """The machine interface. Every key is always present; `null` means the
+    question does not apply, not that it could not be answered. A draft with no
+    prose is an empty list and exit 0, because parsing succeeded and the honest
+    answer is zero."""
+    return {
+        "sections": [{"title": t, "words": w} for t, w in sections],
+        "total": total,
+        "limit": limit,
+        "over": None if limit is None else total - limit,
+    }
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="aidetect count",
                                  description="IB-rules word count for a draft.")
     ap.add_argument("path", help=".docx file to count")
     ap.add_argument("--limit", type=int, default=None,
                     help="word limit to measure against (e.g. 4000 for the EE)")
+    ap.add_argument("--json", action="store_true",
+                    help="emit one JSON object on stdout instead of the table")
     args = ap.parse_args(argv)
 
     if not args.path.lower().endswith(".docx"):
         ap.error("count needs a .docx (a .txt has no headings or styles to go on)")
 
     sections, total = count_docx(args.path)
+
+    if args.json:
+        print(json.dumps(as_json(sections, total, args.limit)))
+        return
     if not sections:
         print("No prose found. Check the file is a draft and not an outline.")
         return

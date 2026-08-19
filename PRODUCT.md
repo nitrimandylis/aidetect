@@ -21,6 +21,7 @@ that need no model stay instant.
   bullets, tables, footnotes, in-text citations and everything from the
   bibliography on, then reports the total **by section** against `--limit`.
   Word's own count is wrong for IB and does not say which section is bloated.
+  `--json` emits the whole thing as one object for scripts and agents.
 - `aidetect score` — the **desklib/ai-text-detector-v1.01** model (DeBERTa, #1
   on the RAID benchmark). Prints an AI score (0–1) per paragraph, flagging
   anything >= 0.5.

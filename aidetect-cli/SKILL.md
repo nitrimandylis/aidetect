@@ -25,7 +25,7 @@ PYTHONPATH=src python -m aidetect.cli <subcommand> ...
 
 | command | cost | notes |
 |---|---|---|
-| `aidetect count <file.docx> [--limit N]` | instant, no model | the IB word count, by section |
+| `aidetect count <file.docx> [--limit N] [--json]` | instant, no model | the IB word count, by section |
 | `aidetect extract <in.docx> <out.txt>` | instant, no model | strips a draft down to finished prose |
 | `aidetect score <file>` | **~1.5 GB download on first run**, then seconds | desklib DeBERTa, higher = more AI-ish, flags >= 0.5 |
 | `aidetect bino <file> --mlx --pair gemma` | **~6 GB download + a local quantization on first run** | Binoculars, **lower** = more AI-ish |
@@ -35,6 +35,22 @@ PYTHONPATH=src python -m aidetect.cli <subcommand> ...
 nothing, and needs no network. Only reach for `score` or `bino` when the user
 actually asks about AI-detection, and say the download is coming before you
 start one.
+
+## Reading the count from a tool call
+
+`count` takes `--json` and emits exactly one object on stdout. Use it rather than
+parsing the table.
+
+```json
+{"sections": [{"title": "Introduction", "words": 812}], "total": 3940, "limit": 4000, "over": -60}
+```
+
+`over` is positive when the draft is over the limit, negative when it has room,
+and `null` together with `limit` when no `--limit` was passed. An empty
+`sections` list with `total: 0` is a real answer, not a failure. Errors exit
+non-zero with a sentence on stderr, so branch on the exit code.
+
+No other subcommand has `--json` yet; `score` and `bino` still print for humans.
 
 ## Things that will bite you
 

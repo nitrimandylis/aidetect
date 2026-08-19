@@ -59,7 +59,7 @@ reminder: directional only, not a Turnitin score.
 | 04 | **offline after setup** | first run pulls ~1.5GB of model, every run after is airgapped — your essay never leaves the laptop |
 | 05 | **second opinion** | cross-check against the lighter [Ejhfast/fast-ai-detector] when one model's paranoia isn't enough |
 | 06 | **Binoculars (Gemma 4)** | a training-free perplexity-ratio detector — near chance with small Qwen pairs, but 96% on the labelled set once swapped to a Gemma 4 pair; see below |
-| 07 | **IB word count** | `aidetect count` counts what the IB counts — no headings, quotes, tables, footnotes, citations or bibliography — and splits the total by section, so an over-long draft tells you *where* |
+| 07 | **IB word count** | `aidetect count` (`--json` for scripts and agents) counts what the IB counts — no headings, quotes, tables, footnotes, citations or bibliography — and splits the total by section, so an over-long draft tells you *where* |
 
 ## 🚀 Run it
 
@@ -70,6 +70,7 @@ uv tool install aidetect      # or: pipx install aidetect
 ```bash
 aidetect                                   # list the five subcommands
 aidetect count "draft.docx" --limit 4000   # IB word count, by section
+aidetect count "draft.docx" --json         # same, as one JSON object
 aidetect score "draft.docx"                # score a whole draft
 aidetect score --text "one sentence"       # score a single string
 aidetect bino  "draft.docx" --mlx --pair gemma
@@ -82,6 +83,19 @@ a minute — that's normal, not a hang. Every run after is fast and offline.
 
 On Apple Silicon the Gemma 4 MLX pair installs automatically. Elsewhere it is
 skipped and the Qwen pairs still work.
+
+### `--json`
+
+`count` takes `--json` and prints exactly one object on stdout, nothing else:
+
+```json
+{"sections": [{"title": "Introduction", "words": 812}], "total": 3940, "limit": 4000, "over": -60}
+```
+
+Every key is always present. `limit` and `over` are `null` when no `--limit` was
+given — that means "does not apply", not "could not be read". A draft with no
+prose is an empty `sections` list and exit 0. Errors go to stderr with a non-zero
+exit, so consumers branch on the exit code rather than parsing error text.
 
 ## 🔩 Under the hood
 
