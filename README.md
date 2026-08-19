@@ -68,6 +68,7 @@ uv tool install aidetect      # or: pipx install aidetect
 ```
 
 ```bash
+aidetect                                   # list the five subcommands
 aidetect count "draft.docx" --limit 4000   # IB word count, by section
 aidetect score "draft.docx"                # score a whole draft
 aidetect score --text "one sentence"       # score a single string
@@ -101,9 +102,11 @@ flowchart LR
 | `src/aidetect/extract.py` | pulls clean prose out of a `.docx` into a `.txt` — drops headings, bullets, note-labels |
 | `src/aidetect/binoculars.py` | training-free perplexity-ratio scorer over a base+instruct LM pair (Qwen, or Gemma 4 via `--mlx`; see below) |
 | `src/aidetect/calibrate.py` | fits a threshold on a labelled set you supply, saves it to `~/.config/aidetect` |
+| `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package |
 | `src/aidetect/thresholds/` | the thresholds shipped with the package; a threshold you fit yourself wins over these |
 | `corpora/` | my labelled calibration sets. Repo-only, deliberately not shipped in the package |
 | `tests/` | count rules and Binoculars math, both self-checking, no model download |
+| `pyproject.toml` | package metadata and dependencies — torch · transformers · python-docx, plus mlx-vlm on Apple Silicon |
 
 ## 🔭 Binoculars: shelved, then revived by Gemma 4
 
@@ -179,7 +182,7 @@ What it can tell you: *"my prose scores like other IAs in this genre."* What it
 can never tell you: *"my prose is human."* Matching a set you cannot vouch for
 proves you are not an outlier, nothing more.
 
-**Stack:** python · pytorch · transformers · desklib DeBERTa
+**Stack:** python · pytorch · transformers · mlx-vlm · desklib DeBERTa
 
 The lighter cross-check tool lives at [Ejhfast/fast-ai-detector] — it's a
 separate repo, not vendored here.

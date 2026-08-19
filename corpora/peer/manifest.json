@@ -1,7 +1,7 @@
 {
-  "_about": "Peer reference set: IB Computer Science IA prose, same genre as the drafts this tool checks (technical documentation, database and GUI description, success-criteria evaluation). Exists because calibration/human is 12 humanities and science Extended Essays, which is the wrong genre for a CS IA and plausibly depresses Binoculars scores on technical writing regardless of authorship.",
+  "_about": "Peer reference set: IB Computer Science IA prose, same genre as the drafts this tool checks (technical documentation, database and GUI description, success-criteria evaluation). Exists because corpora/human is 12 humanities and science Extended Essays, which is the wrong genre for a CS IA and plausibly depresses Binoculars scores on technical writing regardless of authorship.",
   "_provenance_warning": "NONE of these samples can be certified human-written. Every source postdates the public release of ChatGPT (Nov 2022); three of the five were authored in 2025. They are NOT a human class and MUST NOT be used to fit a threshold. Doing so would let AI-assisted text pull the human mean down and make the detector clear a draft for the wrong reason.",
-  "_usage": "Comparison only. calibrate.py globs calibration/human and calibration/ai and does not read this folder, so no code change is needed to keep it out of threshold fitting. Score it to answer 'how does my prose sit next to other IAs in this genre?', never 'am I clean?'.",
+  "_usage": "Comparison only. `aidetect calibrate` reads only the two folders named by --human-dir and --ai-dir, so this one stays out of threshold fitting unless you point at it explicitly. Score it to answer 'how does my prose sit next to other IAs in this genre?', never 'am I clean?'.",
   "provenance": "unverified",
   "excluded_from_threshold": true,
   "samples": [
