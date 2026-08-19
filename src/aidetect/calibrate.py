@@ -1,15 +1,21 @@
 """
-Calibrate the Binoculars threshold for our Qwen pair, then run the check.
+Calibrate the Binoculars threshold for a model pair, then optionally check a draft.
 
-Binoculars outputs a raw score, not a probability, and the AI/human boundary
-is specific to the model pair. This scores our labelled calibration set
-(calibration/human = real pre-2020 IB essays, calibration/ai = LLM-written on
-the same topics), finds the cutoff that best separates them, saves it, and
-then scores a real draft with that cutoff.
+Binoculars outputs a raw score, not a probability, and the AI/human boundary is
+specific to the model pair. This scores a labelled set (a folder of known-human
+prose against a folder of known-LLM prose on the same topics), finds the cutoff
+that best separates them, and saves it to ~/.config/aidetect.
 
-    python calibrate.py                 # calibrate + check EE-clean.txt
-    python calibrate.py path/to/IA.txt  # calibrate + check that file too
-    python calibrate.py --pair big      # use the 1.5B pair
+My own calibration set is not shipped with the package: it is 12 real pre-2020 IB
+Extended Essays and 12 LLM-written imitations, and it lives in corpora/ in the
+repo. Point --human-dir and --ai-dir at your own.
+
+    aidetect calibrate --human-dir corpora/human --ai-dir corpora/ai
+    aidetect calibrate --human-dir corpora/human --ai-dir corpora/ai --mlx --pair gemma
+    aidetect calibrate --human-dir h --ai-dir a --check draft.docx
+
+The human class has to be provably human or the threshold is meaningless. Do not
+point --human-dir at anything written after ChatGPT that you cannot certify.
 """
 
 import argparse
@@ -17,11 +23,10 @@ import glob
 import json
 import os
 
-from binoculars import add_backend_args, load_backend, report, score_text, PAIRS, MLX_PAIRS
-from detect import read_paragraphs
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-CAL_DIR = os.path.join(HERE, "calibration")
+from .binoculars import (MLX_PAIRS, PAIRS, add_backend_args, load_backend,
+                         pair_tag, report, score_text)
+from .paths import ensure_user_dir, user_threshold_path
+from .text import read_paragraphs
 
 
 def score_folder(folder, tokenizer, observer, performer, device, backend="torch"):
@@ -58,23 +63,32 @@ def pick_threshold(human_scores, ai_scores):
     return cutoff, acc
 
 
-def main():
-    ap = argparse.ArgumentParser(description="Calibrate Binoculars threshold, then check a draft.")
-    ap.add_argument("path", nargs="?", default=os.path.join(HERE, "EE-clean.txt"),
-                    help="draft to check after calibrating (default EE-clean.txt)")
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        prog="aidetect calibrate",
+        description="Fit the Binoculars threshold for a model pair on your own labelled set.")
+    ap.add_argument("--human-dir", required=True,
+                    help="folder of .txt files you can certify are human-written")
+    ap.add_argument("--ai-dir", required=True,
+                    help="folder of .txt files you know are LLM-written")
+    ap.add_argument("--check", help="optionally score this draft with the new threshold")
     add_backend_args(ap)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
+
+    for label, folder in (("--human-dir", args.human_dir), ("--ai-dir", args.ai_dir)):
+        if not glob.glob(os.path.join(folder, "*.txt")):
+            ap.error(f"{label}: no .txt files in {folder}")
 
     pair_key, backend, device, tokenizer, observer, performer = load_backend(args)
 
     # --- score the labelled set ---
-    human = score_folder(os.path.join(CAL_DIR, "human"), tokenizer, observer, performer, device, backend)
-    ai = score_folder(os.path.join(CAL_DIR, "ai"), tokenizer, observer, performer, device, backend)
+    human = score_folder(args.human_dir, tokenizer, observer, performer, device, backend)
+    ai = score_folder(args.ai_dir, tokenizer, observer, performer, device, backend)
     human_scores = [s for _, s in human]
     ai_scores = [s for _, s in ai]
 
     print("\n=== calibration scores (higher = more human) ===")
-    print(f"{'HUMAN (real EEs)':<22}{'AI (LLM-written)':<22}")
+    print(f"{'HUMAN':<22}{'AI (LLM-written)':<22}")
     for i in range(max(len(human), len(ai))):
         h = f"{human[i][0]} {human[i][1]:.3f}" if i < len(human) else ""
         a = f"{ai[i][0]} {ai[i][1]:.3f}" if i < len(ai) else ""
@@ -98,15 +112,12 @@ def main():
         "human_mean": round(sum(human_scores)/len(human_scores), 4),
         "ai_mean": round(sum(ai_scores)/len(ai_scores), 4),
     }
-    tag = f"{pair_key}-mlx" if backend == "mlx" else pair_key
-    thr_path = os.path.join(CAL_DIR, f"threshold-{tag}.json")
+    ensure_user_dir()
+    thr_path = user_threshold_path(pair_tag(pair_key, backend))
     json.dump(out, open(thr_path, "w"), indent=2)
-    print(f"    saved -> {os.path.relpath(thr_path, HERE)}")
+    print(f"    saved -> {thr_path}")
 
-    # --- run the calibrated check on the draft ---
-    print(f"\n=== checking {os.path.relpath(args.path, HERE)} with threshold {cutoff:.3f} ===")
-    report(read_paragraphs(args.path), cutoff, tokenizer, observer, performer, device, backend)
-
-
-if __name__ == "__main__":
-    main()
+    # --- run the calibrated check on a draft ---
+    if args.check:
+        print(f"\n=== checking {args.check} with threshold {cutoff:.3f} ===")
+        report(read_paragraphs(args.check), cutoff, tokenizer, observer, performer, device, backend)

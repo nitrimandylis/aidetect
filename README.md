@@ -10,8 +10,9 @@
 
 ### `SCORE YOUR OWN PROSE // BEFORE A TEACHER SCORES IT FOR YOU`
 
-*a local, offline AI-writing detector for drafts you actually wrote*
+*a local, offline AI-writing detector and IB word counter for drafts you actually wrote*
 
+![pypi](https://img.shields.io/badge/pypi-aidetect-3775A9?style=flat-square&labelColor=111111)
 ![language](https://img.shields.io/badge/language-python-3776AB?style=flat-square&labelColor=111111)
 ![runs](https://img.shields.io/badge/runs-offline-2ea043?style=flat-square&labelColor=111111)
 ![model](https://img.shields.io/badge/model-desklib_DeBERTa-8957e5?style=flat-square&labelColor=111111)
@@ -41,7 +42,7 @@ It is directional, not oracular. A high score means "reword this," not "you're
 caught." It is not, and cannot be, the number Turnitin shows a teacher.
 
 ```console
-nick@ai-detect:~$ python detect.py EE-clean.txt
+nick@aidetect:~$ aidetect score EE-clean.txt
 P  1   0.08  [##------------------]
 P  2   0.71  [##############------]  <-- AI-ish
 average AI score: 0.34   |   1/6 paragraphs flagged
@@ -54,33 +55,38 @@ reminder: directional only, not a Turnitin score.
 |---|---|---|
 | 01 | **per-paragraph scoring** | what it actually catches — splits your draft and scores each paragraph, so you fix the two bad ones instead of rewriting everything |
 | 02 | **docx + txt input** | reads Word files straight (paragraphs, no headings) or plain text split on blank lines |
-| 03 | **prose extractor** | `extract.py` strips headings, bullets, footnotes and your own note-scaffolding first, so the score is about writing, not structure |
+| 03 | **prose extractor** | `aidetect extract` strips headings, bullets, footnotes and your own note-scaffolding first, so the score is about writing, not structure |
 | 04 | **offline after setup** | first run pulls ~1.5GB of model, every run after is airgapped — your essay never leaves the laptop |
 | 05 | **second opinion** | cross-check against the lighter [Ejhfast/fast-ai-detector] when one model's paranoia isn't enough |
 | 06 | **Binoculars (Gemma 4)** | a training-free perplexity-ratio detector — near chance with small Qwen pairs, but 96% on the labelled set once swapped to a Gemma 4 pair; see below |
+| 07 | **IB word count** | `aidetect count` counts what the IB counts — no headings, quotes, tables, footnotes, citations or bibliography — and splits the total by section, so an over-long draft tells you *where* |
 
 ## 🚀 Run it
 
-Needs Python and a machine that can hold a DeBERTa model (built and tested on
-an 18GB Apple Silicon Mac, MPS-accelerated).
-
 ```bash
-git clone https://github.com/nitrimandylis/ai-detect.git
-cd ai-detect
-pip install -r requirements.txt
-
-python detect.py "path/to/draft.docx"     # score a whole draft
-python detect.py --text "one sentence"    # score a single string
+uv tool install aidetect      # or: pipx install aidetect
 ```
 
-First run downloads the model and will sit there for a minute — that's normal,
-not a hang. Every run after is fast and offline.
+```bash
+aidetect count "draft.docx" --limit 4000   # IB word count, by section
+aidetect score "draft.docx"                # score a whole draft
+aidetect score --text "one sentence"       # score a single string
+aidetect bino  "draft.docx" --mlx --pair gemma
+```
+
+`count` and `extract` are instant and need no model. `score` and `bino` need a
+machine that can hold a transformer: built and tested on an 18GB Apple Silicon
+Mac, MPS-accelerated. Their first run downloads the model and will sit there for
+a minute — that's normal, not a hang. Every run after is fast and offline.
+
+On Apple Silicon the Gemma 4 MLX pair installs automatically. Elsewhere it is
+skipped and the Qwen pairs still work.
 
 ## 🔩 Under the hood
 
 ```mermaid
 flowchart LR
-    A[.docx / .txt] --> B[extract.py<br/>strip non-prose]
+    A[.docx / .txt] --> B[aidetect extract<br/>strip non-prose]
     B --> C[read_paragraphs<br/>>= 25 words]
     C --> D[desklib DeBERTa<br/>mean-pool + sigmoid]
     D --> E[per-paragraph<br/>0-1 score + flags]
@@ -88,12 +94,16 @@ flowchart LR
 
 | file | job |
 |---|---|
-| `detect.py` | loads the desklib model, scores each paragraph, prints the bars and flags |
-| `extract.py` | pulls clean prose out of a `.docx` into a `.txt` — drops headings, bullets, note-labels |
-| `binoculars.py` | training-free perplexity-ratio scorer over a base+instruct LM pair (Qwen, or Gemma 4 via `--mlx`; see below) |
-| `calibrate.py` | scores the labelled `calibration/` set, finds the threshold, then checks a draft |
-| `test_binoculars.py` | math + threshold self-checks, no model download |
-| `requirements.txt` | torch · transformers · python-docx (+ optional mlx-vlm for `--mlx`) |
+| `src/aidetect/cli.py` | the `aidetect` entry point — dispatches subcommands, importing each lazily so `count` never loads torch |
+| `src/aidetect/text.py` | shared, torch-free: what counts as prose, what ends a document, how a `.docx` is read |
+| `src/aidetect/count.py` | the IB word count — sections, citation stripping, budget |
+| `src/aidetect/detect.py` | loads the desklib model, scores each paragraph, prints the bars and flags |
+| `src/aidetect/extract.py` | pulls clean prose out of a `.docx` into a `.txt` — drops headings, bullets, note-labels |
+| `src/aidetect/binoculars.py` | training-free perplexity-ratio scorer over a base+instruct LM pair (Qwen, or Gemma 4 via `--mlx`; see below) |
+| `src/aidetect/calibrate.py` | fits a threshold on a labelled set you supply, saves it to `~/.config/aidetect` |
+| `src/aidetect/thresholds/` | the thresholds shipped with the package; a threshold you fit yourself wins over these |
+| `corpora/` | my labelled calibration sets. Repo-only, deliberately not shipped in the package |
+| `tests/` | count rules and Binoculars math, both self-checking, no model download |
 
 ## 🔭 Binoculars: shelved, then revived by Gemma 4
 
@@ -103,8 +113,8 @@ text through two LMs that share a tokenizer (a base "observer" and an instruct
 is Falcon-7B ×2 (~28GB) — too big for an 18GB Mac, so the fallback was a small
 same-family pair (Qwen2.5-0.5B or 1.5B) that fits.
 
-`calibrate.py` scores a labelled set — 12 real pre-2020 IB Extended Essay
-paragraphs vs 12 LLM-written ones on the same topics — and finds the best
+`aidetect calibrate` scores a labelled set — mine is 12 real pre-2020 IB Extended
+Essay paragraphs vs 12 LLM-written ones on the same topics — and finds the best
 separating threshold. Measured across pairs:
 
 | pair | best separation | chance |
@@ -122,14 +132,17 @@ and separates the set at 96%. Gemma 4 ships as a multimodal checkpoint, so
 [mlx-vlm](https://github.com/Blaizzy/mlx-vlm), fitting the 18GB Mac in ~6GB:
 
 ```bash
-pip install mlx-vlm
-python calibrate.py IA-clean.txt --mlx --pair gemma   # calibrate + check
-python binoculars.py IA-clean.txt --mlx --pair gemma  # reuses the saved threshold
+aidetect bino IA-clean.txt --mlx --pair gemma   # uses the shipped threshold
+
+# refit the threshold on your own labelled set
+aidetect calibrate --human-dir corpora/human --ai-dir corpora/ai --mlx --pair gemma
 ```
 
 desklib stays the primary detector; Binoculars is now a usable second opinion
-rather than a dead end. Run `python calibrate.py` (add `--mlx --pair gemma`) to
-reproduce the numbers.
+rather than a dead end. The calibration sets are not shipped with the package —
+clone the repo to reproduce the numbers, or point `--human-dir`/`--ai-dir` at
+your own. Your fitted threshold lands in `~/.config/aidetect` and takes
+precedence over the shipped one, so it survives an upgrade.
 
 ## 🧪 The peer set: genre context, not a human class
 
@@ -140,7 +153,7 @@ predictable token-by-token, which drags perplexity-ratio scores down no matter
 who typed it. So a CS IA scoring below the EE human mean means less than it
 looks.
 
-`calibration/peer/` holds 12 paragraphs of real IB Computer Science IA prose
+`corpora/peer/` holds 12 paragraphs of real IB Computer Science IA prose
 (5 projects, 5 authors: sudokuMaster, IBOrganizer, MyCalendar, and two
 IBO-published new-syllabus specimens). Measured against the same anchors:
 
@@ -158,9 +171,9 @@ postdates ChatGPT; three of the five were written in 2025. None carries an
 authorship attestation, and in 2025 a fair share of student IAs were not
 written unaided. Fold that into `human/` and any AI-assisted sample drags the
 mean down, lowers the threshold, and the tool starts clearing drafts for the
-wrong reason, a detector that reassures instead of measures. `calibrate.py`
-globs only `calibration/human` and `calibration/ai`, so `peer/` stays out of
-threshold fitting by construction, not by discipline.
+wrong reason, a detector that reassures instead of measures. `aidetect calibrate`
+reads only the two folders you name, so `peer/` stays out of threshold fitting
+by construction, not by discipline.
 
 What it can tell you: *"my prose scores like other IAs in this genre."* What it
 can never tell you: *"my prose is human."* Matching a set you cannot vouch for

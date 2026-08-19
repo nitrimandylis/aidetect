@@ -19,25 +19,26 @@ why this was shelved as a negative result. A Gemma 4 pair fixes that: it hits
 ~96% on the calibration set. Gemma 4 ships as a multimodal checkpoint, so the
 --mlx path loads it 4-bit via mlx-vlm and runs it text-only.
 
-    python binoculars.py path/to/draft.docx
-    python binoculars.py notes.txt --text "some sentence to score"
-    python binoculars.py notes.txt --pair big         # bigger Qwen pair
-    python binoculars.py notes.txt --mlx --pair gemma # Gemma 4 E2B on a Mac
+    aidetect bino path/to/draft.docx
+    aidetect bino notes.txt --text "some sentence to score"
+    aidetect bino notes.txt --pair big         # bigger Qwen pair
+    aidetect bino notes.txt --mlx --pair gemma # Gemma 4 E2B on a Mac
 
-Threshold: the AI/human boundary is PER MODEL PAIR. If calibrate.py has saved a
+Threshold: the AI/human boundary is PER MODEL PAIR. If `aidetect calibrate` has saved a
 threshold for the active pair it's loaded automatically; otherwise it falls back
 to Falcon's 0.90 placeholder. Lower score = more AI-like.
 """
 
 import argparse
 import os
-import sys
 
 import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from detect import read_paragraphs, bar, MIN_WORDS, pick_device
+from .detect import pick_device
+from .paths import threshold_path, user_threshold_path
+from .text import MIN_WORDS, bar, read_paragraphs
 
 # Same-tokenizer pairs. base = observer, instruct = performer.
 # Gemma 4 is Apache-2 (no HF gate). E2B is the smallest but ~5B raw params each,
@@ -63,14 +64,21 @@ MAX_LEN = 1024        # token window; longer paragraphs get truncated
 DEFAULT_THRESHOLD = 0.90
 
 
+def pair_tag(pair_key, backend):
+    return f"{pair_key}-mlx" if backend == "mlx" else pair_key
+
+
 def load_saved_threshold(pair_key, backend):
-    """Return calibrate.py's saved threshold for this pair, or None if never calibrated."""
+    """Return the saved threshold for this pair, or None if never calibrated.
+
+    A threshold you fitted yourself (~/.config/aidetect) wins over the one
+    shipped in the wheel, so recalibrating survives an upgrade.
+    """
     import json
-    tag = f"{pair_key}-mlx" if backend == "mlx" else pair_key
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "calibration", f"threshold-{tag}.json")
-    if os.path.exists(path):
-        return json.load(open(path)).get("threshold")
+    tag = pair_tag(pair_key, backend)
+    for path in (user_threshold_path(tag), threshold_path(tag)):
+        if path and os.path.exists(path):
+            return json.load(open(path)).get("threshold")
     return None
 
 
@@ -199,18 +207,19 @@ def report(paragraphs, threshold, tokenizer, observer, performer, device, backen
     low = sum(1 for s in scores if s < threshold)
     print("-" * 60)
     print(f"average Binoculars score: {avg:.2f}   |   {low}/{len(scores)} paragraphs flagged (< {threshold})")
-    print("reminder: directional only. Lower = more AI-like. Calibrate the threshold with calibrate.py.")
+    print("reminder: directional only. Lower = more AI-like. Recalibrate with `aidetect calibrate`.")
 
 
-def main():
-    ap = argparse.ArgumentParser(description="Binoculars AI-text detector (second opinion).")
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="aidetect bino",
+                                 description="Binoculars AI-text detector (second opinion).")
     ap.add_argument("path", nargs="?", help=".docx or .txt file to score")
     ap.add_argument("--text", help="score a single string instead of a file")
     add_backend_args(ap)
     ap.add_argument("--threshold", type=float, default=None,
                     help="flag paragraphs below this (default: calibrated pair threshold, else %s)"
                          % DEFAULT_THRESHOLD)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     if not args.path and not args.text:
         ap.error("give a file path or --text")
@@ -232,7 +241,3 @@ def main():
         print(f"Binoculars score: {s:.2f}  ({verdict}, threshold {threshold})")
     else:
         report(read_paragraphs(args.path), threshold, tokenizer, observer, performer, device, backend)
-
-
-if __name__ == "__main__":
-    sys.exit(main())

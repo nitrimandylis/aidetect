@@ -7,21 +7,21 @@ first model download. The score is a rough, directional read, NOT Turnitin:
 high just means "this paragraph reads AI-ish, maybe reword it".
 
 Usage:
-    python detect.py path/to/draft.docx
-    python detect.py notes.txt
-    python detect.py --text "some sentence to score"
+    aidetect score path/to/draft.docx
+    aidetect score notes.txt
+    aidetect score --text "some sentence to score"
 """
 
 import argparse
-import sys
 
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, AutoConfig, AutoModel, PreTrainedModel
 
+from .text import MIN_WORDS, bar, read_paragraphs
+
 MODEL_ID = "desklib/ai-text-detector-v1.01"
 MAX_LEN = 768          # model's token window; longer paragraphs get truncated
-MIN_WORDS = 25         # ponytail: skip fragments; short text scores as noise
 
 
 # --- the model class, copied verbatim from the desklib model card ---
@@ -81,25 +81,6 @@ def score_text(text, tokenizer, model, device):
         return torch.sigmoid(logits).item()
 
 
-def read_paragraphs(path):
-    """Pull prose paragraphs out of a .docx or .txt file."""
-    if path.lower().endswith(".docx"):
-        import docx  # python-docx, only needed for Word files
-        doc = docx.Document(path)
-        chunks = [p.text for p in doc.paragraphs]
-    else:
-        with open(path, encoding="utf-8") as f:
-            # blank line separates paragraphs in a plain-text file
-            chunks = f.read().split("\n\n")
-    # keep only real paragraphs, not headings/blanks/fragments
-    return [c.strip() for c in chunks if len(c.split()) >= MIN_WORDS]
-
-
-def bar(prob, width=20):
-    filled = round(prob * width)
-    return "#" * filled + "-" * (width - filled)
-
-
 def report(paragraphs, tokenizer, model, device):
     if not paragraphs:
         print("No paragraphs with >= %d words found." % MIN_WORDS)
@@ -119,11 +100,12 @@ def report(paragraphs, tokenizer, model, device):
     print("reminder: directional only, not a Turnitin score.")
 
 
-def main():
-    ap = argparse.ArgumentParser(description="Local AI-writing detector (desklib).")
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="aidetect score",
+                                 description="Local AI-writing detector (desklib).")
     ap.add_argument("path", nargs="?", help=".docx or .txt file to score")
     ap.add_argument("--text", help="score a single string instead of a file")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     if not args.path and not args.text:
         ap.error("give a file path or --text")
@@ -137,7 +119,3 @@ def main():
         print(f"AI score: {prob:.2f}  [{bar(prob)}]")
     else:
         report(read_paragraphs(args.path), tokenizer, model, device)
-
-
-if __name__ == "__main__":
-    sys.exit(main())

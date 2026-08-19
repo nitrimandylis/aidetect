@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aidetect"
+version = "0.1.0"
+description = "Local, offline AI-writing detector and IB word counter for your own drafts"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Nikolas Trimandylis" }]
+keywords = ["ai-detection", "binoculars", "ib", "word-count", "docx"]
+classifiers = [
+  "Environment :: Console",
+  "Programming Language :: Python :: 3",
+  "Topic :: Text Processing :: Linguistic",
+]
+dependencies = [
+  "torch",
+  "transformers",
+  "python-docx",
+  # Apple Silicon only: enables the 4-bit Gemma 4 pair, the one that actually
+  # separates human from AI text. Gemma 4 is a VLM checkpoint, hence mlx-vlm.
+  "mlx-vlm; sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
+
+[project.urls]
+Homepage = "https://github.com/nitrimandylis/aidetect"
+Source = "https://github.com/nitrimandylis/aidetect"
+
+[project.scripts]
+aidetect = "aidetect.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aidetect"]
+
+[tool.hatch.build.targets.sdist]
+# corpora/ is 12 real students' Extended Essays plus LLM imitations, and the
+# *-clean.txt files are my own drafts. Repo-only, never redistributed.
+exclude = ["corpora", "*-clean.txt", "fast-ai-detector"]

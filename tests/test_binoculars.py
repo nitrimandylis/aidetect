@@ -1,10 +1,15 @@
 """Math checks for the Binoculars core — no model download needed."""
 
 import math
+import os
+import sys
+
 import torch
 
-from binoculars import perplexity, cross_perplexity
-from calibrate import pick_threshold
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from aidetect.binoculars import cross_perplexity, perplexity  # noqa: E402
+from aidetect.calibrate import pick_threshold  # noqa: E402
 
 
 def test_perplexity_confident_correct_is_low():
