@@ -54,12 +54,12 @@ reminder: directional only, not a Turnitin score.
 | | feature | what it actually does |
 |---|---|---|
 | 01 | **per-paragraph scoring** | what it actually catches — splits your draft and scores each paragraph, so you fix the two bad ones instead of rewriting everything |
-| 02 | **docx + txt input** | reads Word files straight (paragraphs, no headings) or plain text split on blank lines |
-| 03 | **prose extractor** | `aidetect extract` strips headings, bullets, footnotes and your own note-scaffolding first, so the score is about writing, not structure |
+| 02 | **docx + txt input** | reads Word files through the same walker `count` uses — no cover page, no contents, no headings, no bibliography — or plain text split on blank lines |
+| 03 | **prose extractor** | `aidetect extract` dumps a draft's countable prose to a `.txt` so you can eyeball exactly what got counted |
 | 04 | **offline after setup** | first run pulls ~1.5GB of model, every run after is airgapped — your essay never leaves the laptop |
 | 05 | **second opinion** | cross-check against the lighter [Ejhfast/fast-ai-detector] when one model's paranoia isn't enough |
 | 06 | **Binoculars (Gemma 4)** | a training-free perplexity-ratio detector — near chance with small Qwen pairs, but 96% on the labelled set once swapped to a Gemma 4 pair; see below |
-| 07 | **IB word count** | `aidetect count` (`--json` for scripts and agents) counts what the IB counts — no headings, quotes, tables, footnotes, citations or bibliography — and splits the total by section, so an over-long draft tells you *where* |
+| 07 | **IB word count** | `aidetect count` (`--json` for scripts and agents) counts what the IB counts — no cover page, contents, headings, captions, tables, footnotes, citations or bibliography — and splits the total by section and sub-section, so an over-long draft tells you *where* |
 
 ## 🚀 Run it
 
@@ -71,6 +71,7 @@ uv tool install aidetect      # or: pipx install aidetect
 aidetect                                   # list the five subcommands
 aidetect count "draft.docx" --limit 4000   # IB word count, by section
 aidetect count "draft.docx" --json         # same, as one JSON object
+aidetect extract "draft.docx"              # -> "draft prose.txt", what got counted
 aidetect score "draft.docx"                # score a whole draft
 aidetect score --text "one sentence"       # score a single string
 aidetect bino  "draft.docx" --mlx --pair gemma
@@ -89,7 +90,10 @@ skipped and the Qwen pairs still work.
 `count` takes `--json` and prints exactly one object on stdout, nothing else:
 
 ```json
-{"sections": [{"title": "Introduction", "words": 812}], "total": 3940, "limit": 4000, "over": -60}
+{"sections": [{"title": "Introduction", "words": 812, "level": 1},
+              {"title": "Analysis", "words": 0, "level": 1},
+              {"title": "Porter's Five Forces", "words": 1021, "level": 2}],
+ "total": 3940, "limit": 4000, "over": -60}
 ```
 
 Every key is always present. `limit` and `over` are `null` when no `--limit` was
@@ -97,23 +101,44 @@ given — that means "does not apply", not "could not be read". A draft with no
 prose is an empty `sections` list and exit 0. Errors go to stderr with a non-zero
 exit, so consumers branch on the exit code rather than parsing error text.
 
+`words` is a section's *own* words, never its children's, so `sum(words)` equals
+`total` and nothing double-counts. The table you see rolls sub-sections up into
+their parent for display; do the same yourself with `level` if you want subtotals.
+
+### What counts
+
+Excluded by *position*, not by wording: everything before the first heading (the
+cover page), the Table of Contents section, headings themselves, `Figure 3: ...`
+captions, tables, footnotes, and everything from the Bibliography heading on.
+In-text citations are stripped from the paragraphs that survive.
+
+Block quotes and body bullet lists **do** count — they are assessed prose. A
+caption needs its colon to be dropped, so `Figure 4 shows revenue rising` is
+counted while `Figure 4: Revenue, 2021–2025` is not. A draft with no headings at
+all is counted whole, with a note, rather than reporting a confident zero.
+
 ## 🔩 Under the hood
 
 ```mermaid
 flowchart LR
-    A[.docx / .txt] --> B[aidetect extract<br/>strip non-prose]
-    B --> C[read_paragraphs<br/>>= 25 words]
-    C --> D[desklib DeBERTa<br/>mean-pool + sigmoid]
-    D --> E[per-paragraph<br/>0-1 score + flags]
+    A[.docx] --> B[walk<br/>structure: drop cover,<br/>contents, headings,<br/>captions, bibliography]
+    B --> C[aidetect count<br/>strip citations,<br/>total by section]
+    B --> D[is_prose<br/>style: >= 25 words,<br/>no bullets or scaffolding]
+    D --> E[desklib DeBERTa<br/>mean-pool + sigmoid]
+    E --> F[per-paragraph<br/>0-1 score + flags]
 ```
+
+One walker decides what is *in* the document; two thin filters decide what each
+job wants from it. A 6-word sentence is a word the examiner counts and noise to
+the detector, which is the whole reason the split exists.
 
 | file | job |
 |---|---|
 | `src/aidetect/cli.py` | the `aidetect` entry point — dispatches subcommands, importing each lazily so `count` never loads torch |
-| `src/aidetect/text.py` | shared, torch-free: what counts as prose, what ends a document, how a `.docx` is read |
-| `src/aidetect/count.py` | the IB word count — sections, citation stripping, budget |
+| `src/aidetect/text.py` | shared, torch-free: `walk()` reads a `.docx`'s structure once, `is_prose()` is the detector's separate style filter |
+| `src/aidetect/count.py` | the IB word count — sections, rollup, citation stripping, budget |
 | `src/aidetect/detect.py` | loads the desklib model, scores each paragraph, prints the bars and flags |
-| `src/aidetect/extract.py` | pulls clean prose out of a `.docx` into a `.txt` — drops headings, bullets, note-labels |
+| `src/aidetect/extract.py` | dumps a `.docx`'s countable prose into a `.txt`, the same words `count` counts |
 | `src/aidetect/binoculars.py` | training-free perplexity-ratio scorer over a base+instruct LM pair (Qwen, or Gemma 4 via `--mlx`; see below) |
 | `src/aidetect/calibrate.py` | fits a threshold on a labelled set you supply, saves it to `~/.config/aidetect` |
 | `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package |

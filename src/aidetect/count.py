@@ -1,16 +1,21 @@
 """
 IB word count for a draft.
 
-Word's own count is wrong for IB: it counts headings, block quotes, tables,
-footnotes and citations, none of which are assessed. This counts what the IB
-counts, and splits the total by section so an over-long draft says WHERE.
+Word's own count is wrong for IB: it counts the cover page, the contents page,
+headings, figure captions, tables and footnotes, none of which are assessed.
+This counts what the IB counts, and splits the total by section so an over-long
+draft says WHERE.
 
-Excluded, per the IB rules that are common to the EE and the subject IAs:
-  - headings                  (skipped by style)
-  - the bibliography onward   (stop at the Bibliography/Works Cited heading)
-  - block quotes and bullets  (same first-character rule extract.py uses)
-  - tables and footnotes      (python-docx never puts them in doc.paragraphs)
-  - in-text citations         (parentheticals containing a year / ibid / et al)
+Excluded, per the IB rules common to the EE and the subject IAs:
+  - the cover page             (everything before the first heading)
+  - the contents page          (the Table of Contents section)
+  - headings                   (skipped by style)
+  - figure and table captions  ("Figure 3: ..." — the colon is required)
+  - tables and footnotes       (python-docx never puts them in doc.paragraphs)
+  - the bibliography onward    (stop at the Bibliography/Works Cited heading)
+  - in-text citations          (parentheticals containing a year / ibid / et al)
+
+Block quotes and bullet lists in the body DO count: they are assessed prose.
 
     aidetect count draft.docx
     aidetect count draft.docx --limit 4000
@@ -21,7 +26,7 @@ import argparse
 import json
 import re
 
-from .text import is_end_heading, is_heading, is_prose
+from .text import has_headings, walk
 
 # A parenthetical is a citation if it carries a 4-digit year, "ibid" or "et al".
 # ponytail: narrow on purpose. "(the second of these)" is prose and stays counted;
@@ -44,32 +49,58 @@ def count_words(text):
 
 
 def count_docx(path):
-    """Return (sections, total). sections is a list of (heading, words)."""
-    import docx
+    """Return (sections, total).
 
-    sections = [("(untitled)", 0)]
-    for p in docx.Document(path).paragraphs:
-        if is_end_heading(p):
-            break
-        if is_heading(p):
-            title = p.text.strip()
-            if title:
-                sections.append((title, 0))
+    sections is a list of (level, title, words), in document order. `words` is
+    that heading's OWN words, never its children's, so sum(words) == total and
+    nothing double-counts. The rollup is a display concern, see rolled_up().
+    """
+    sections = []
+    for level, title, text in walk(path):
+        if text is None:
+            sections.append((level, title, 0))   # a heading announcing itself
             continue
-        # min_words=1: the 25-word floor is a detector heuristic. A one-line
-        # paragraph is still words the examiner counts.
-        if is_prose(p, min_words=1):
-            title, words = sections[-1]
-            sections[-1] = (title, words + count_words(p.text))
-    sections = [s for s in sections if s[1] > 0]
-    return sections, sum(w for _, w in sections)
+        if not sections:
+            # Only reachable for a headingless draft, which the walker counts
+            # whole and gives a single stand-in title.
+            sections.append((level, title, 0))
+        open_level, open_title, words = sections[-1]
+        sections[-1] = (open_level, open_title, words + count_words(text))
+
+    total = sum(words for _level, _title, words in sections)
+    rolled = rolled_up(sections)
+    # A section with no words of its own AND no children said nothing. A parent
+    # with children keeps its row so the children have something to hang under.
+    sections = [s for s, r in zip(sections, rolled) if r > 0]
+    return sections, total
 
 
-def report(sections, total, limit):
-    width = max((len(t) for t, _ in sections), default=10)
-    for title, words in sections:
+def rolled_up(sections):
+    """Each section's words including every section nested under it.
+
+    A section owns the ones that follow it until a heading at its own level or
+    higher shows up: Heading 1 'Analysis' owns the Heading 2s and Heading 3s
+    after it, and stops at the next Heading 1.
+    """
+    totals = []
+    for i, (level, _title, words) in enumerate(sections):
+        running = words
+        for deeper_level, _t, deeper_words in sections[i + 1:]:
+            if deeper_level <= level:
+                break
+            running += deeper_words
+        totals.append(running)
+    return totals
+
+
+def report(sections, total, limit, whole_document=False):
+    rolled = rolled_up(sections)
+    labels = ["  " * (level - 1) + title for level, title, _w in sections]
+    width = max((len(label) for label in labels), default=10)
+    width = max(width, len("TOTAL"))
+    for label, words in zip(labels, rolled):
         share = words / total if total else 0
-        print(f"  {title:<{width}}  {words:>5}  {'#' * round(share * 30)}")
+        print(f"  {label:<{width}}  {words:>5}  {'#' * round(share * 30)}")
     print("-" * (width + 40))
     if limit:
         over = total - limit
@@ -77,17 +108,25 @@ def report(sections, total, limit):
         print(f"  {'TOTAL':<{width}}  {total:>5}  / {limit} limit, {verdict}")
     else:
         print(f"  {'TOTAL':<{width}}  {total:>5}")
-    print("excludes headings, quotes, bullets, tables, footnotes, "
-          "citations and everything from the bibliography on.")
+    print("excludes the cover page, contents, headings, captions, tables, "
+          "footnotes, citations and everything from the bibliography on.")
+    print("indented rows are counted inside the section above them, not on top of it.")
+    if whole_document:
+        print("note: this draft has no headings, so nothing could be excluded "
+              "as a cover page.")
 
 
 def as_json(sections, total, limit):
     """The machine interface. Every key is always present; `null` means the
     question does not apply, not that it could not be answered. A draft with no
     prose is an empty list and exit 0, because parsing succeeded and the honest
-    answer is zero."""
+    answer is zero.
+
+    `words` is own-words-only, so sum(words) == total. Roll up yourself with
+    `level` if you want subtotals; adding them here would double-count.
+    """
     return {
-        "sections": [{"title": t, "words": w} for t, w in sections],
+        "sections": [{"title": t, "words": w, "level": lv} for lv, t, w in sections],
         "total": total,
         "limit": limit,
         "over": None if limit is None else total - limit,
@@ -105,7 +144,8 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     if not args.path.lower().endswith(".docx"):
-        ap.error("count needs a .docx (a .txt has no headings or styles to go on)")
+        ap.error("count needs a .docx (styles are how it finds headings); "
+                 "re-save the file as .docx first")
 
     sections, total = count_docx(args.path)
 
@@ -115,4 +155,4 @@ def main(argv=None):
     if not sections:
         print("No prose found. Check the file is a draft and not an outline.")
         return
-    report(sections, total, args.limit)
+    report(sections, total, args.limit, whole_document=not has_headings(args.path))
