@@ -1,0 +1,41 @@
+# Publishes to PyPI when a GitHub release is published.
+#
+# No token anywhere: PyPI trusts this exact workflow in this exact repo through
+# OpenID Connect, which is why `id-token: write` and the `pypi` environment below
+# are not optional — they are the identity PyPI checks against its publisher config.
+#
+# To ship a version: bump `version` in pyproject.toml, commit, then draft a release
+# on GitHub tagged v<version>. Nothing is built or uploaded from a laptop.
+name: publish
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      # The wheel is py3-none-any, so a Linux runner builds the same artifact a Mac
+      # would. The mlx-vlm dependency is a marker, not a build input.
+      - run: uv run --no-project --with python-docx python tests/test_count.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
