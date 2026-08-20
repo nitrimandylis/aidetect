@@ -4,9 +4,10 @@ Local, offline AI-writing checks and IB word counts for my own drafts (EE, IA,
 etc). Tells me whether my prose reads as AI-generated *before* a teacher runs
 Turnitin, and whether the draft is over its word limit before I hand it in.
 
-Packaged for PyPI as `aidetect` so it installs rather than being cloned. The
-0.1.0 wheel is built and verified against a clean venv; the upload itself has
-not happened yet.
+Published to PyPI as `aidetect` (0.1.0, 2026-08-20) so it installs rather than
+being cloned. Releases go out from a GitHub release via trusted publishing —
+`.github/workflows/publish.yml`, no token anywhere. To ship a version: bump
+`version` in pyproject.toml, then draft a release tagged `v<version>`.
 
 ```bash
 uv tool install aidetect
