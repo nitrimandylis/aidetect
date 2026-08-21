@@ -5,9 +5,9 @@ description: Drive the aidetect CLI — counts a draft the way the IB counts it 
 
 # aidetect
 
-One command, five subcommands, all safe to run unattended. Two are instant; two
-download gigabytes on their first run. Knowing which is which is most of what
-this skill is for.
+One command, five subcommands, all safe to run unattended. Two are instant; the
+three that load a model download gigabytes on their first run. Knowing which is
+which is most of what this skill is for.
 
 ## Setup
 
@@ -25,8 +25,8 @@ PYTHONPATH=src python -m aidetect.cli <subcommand> ...
 
 | command | cost | notes |
 |---|---|---|
-| `aidetect count <file.docx> [--limit N] [--json]` | instant, no model | the IB word count, by section |
-| `aidetect extract <in.docx> <out.txt>` | instant, no model | strips a draft down to finished prose |
+| `aidetect count <file.docx> [--limit N] [--json]` | instant, no model | the IB word count, by section and sub-section |
+| `aidetect extract <in.docx> [out.txt]` | instant, no model | writes the counted paragraphs out; defaults to `<name> prose.txt` beside the original |
 | `aidetect score <file>` | **~1.5 GB download on first run**, then seconds | desklib DeBERTa, higher = more AI-ish, flags >= 0.5 |
 | `aidetect bino <file> --mlx --pair gemma` | **~6 GB download + a local quantization on first run** | Binoculars, **lower** = more AI-ish |
 | `aidetect calibrate --human-dir D --ai-dir D` | as `bino`, times the sample count | refits a threshold; needs data that does not ship |
@@ -42,13 +42,20 @@ start one.
 parsing the table.
 
 ```json
-{"sections": [{"title": "Introduction", "words": 812}], "total": 3940, "limit": 4000, "over": -60}
+{"sections": [{"title": "Introduction", "words": 812, "level": 1},
+              {"title": "Porter's Five Forces", "words": 1021, "level": 2}],
+ "total": 3940, "limit": 4000, "over": -60}
 ```
 
 `over` is positive when the draft is over the limit, negative when it has room,
 and `null` together with `limit` when no `--limit` was passed. An empty
 `sections` list with `total: 0` is a real answer, not a failure. Errors exit
 non-zero with a sentence on stderr, so branch on the exit code.
+
+`words` is a section's own words and never its children's, so `sum(words)`
+equals `total`. The printed table shows something different: it rolls each
+sub-section up into its parent for display. Use `level` if you want those
+subtotals, and do not add rolled figures back into the total.
 
 No other subcommand has `--json` yet; `score` and `bino` still print for humans.
 
@@ -60,9 +67,23 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
 - **`bino`'s default pair is near-chance and must not be used.** `--pair small`
   separates the calibration set at 62%, `big` at 67%. Only `--mlx --pair gemma`
   (95.8%) is worth reporting. On this Mac always pass both flags.
-- **`count` takes a `.docx` only.** It errors on `.txt`, because a text file has
-  no headings or styles to find sections and quotes with. `score` and `extract`
-  do accept `.txt`.
+- **`--pair gemma+` (E4B) ships no fitted threshold.** It falls back to the
+  Falcon placeholder of 0.9 and prints no "using calibrated threshold" line, so
+  its flags mean nothing. Only `small`, `big` and the MLX `gemma` pair have
+  thresholds in the package.
+- **`count` and `extract` take a `.docx` only.** Both error on `.txt`, because a
+  text file has no styles, and styles are how they find headings and therefore
+  sections. `score` and `bino` are the two that accept `.txt`.
+- **Block quotes and body bullet lists count.** They are assessed prose. What
+  `count` drops, it drops by *position*: everything before the first heading
+  (the cover page), the Table of Contents section, headings themselves,
+  captions, tables, footnotes, and everything from the bibliography heading on.
+- **A caption is only dropped if it has a colon.** `Figure 4: Revenue,
+  2021-2025` is excluded, `Figure 4 shows revenue rising` is a sentence and
+  counts. A draft that labels its figures without colons will read high.
+- **A draft with no headings is counted whole**, cover page included, and
+  `count` says so in a note under the table. Repeat that note instead of giving
+  the total on its own, because nothing was excluded from it.
 - **The scorers skip paragraphs under 25 words**, so a short or bullet-heavy
   draft can legitimately report "no paragraphs found". That is not a failure.
   `count` has no such floor and counts everything.

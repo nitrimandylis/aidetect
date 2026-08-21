@@ -4,7 +4,7 @@ Local, offline AI-writing checks and IB word counts for my own drafts (EE, IA,
 etc). Tells me whether my prose reads as AI-generated *before* a teacher runs
 Turnitin, and whether the draft is over its word limit before I hand it in.
 
-Published to PyPI as `aidetect` (0.1.0, 2026-08-20) so it installs rather than
+Published to PyPI as `aidetect` (0.2.0, 2026-08-20) so it installs rather than
 being cloned. Releases go out from a GitHub release via trusted publishing —
 `.github/workflows/publish.yml`, no token anywhere. To ship a version: bump
 `version` in pyproject.toml, then draft a release tagged `v<version>`.
@@ -18,11 +18,13 @@ uv tool install aidetect
 One command, five subcommands. Subcommand modules import lazily, so the two
 that need no model stay instant.
 
-- `aidetect count` — the IB word count. Excludes headings, block quotes,
-  bullets, tables, footnotes, in-text citations and everything from the
-  bibliography on, then reports the total **by section** against `--limit`.
-  Word's own count is wrong for IB and does not say which section is bloated.
-  `--json` emits the whole thing as one object for scripts and agents.
+- `aidetect count` — the IB word count. Excludes the cover page, the contents
+  page, headings, figure captions, tables, footnotes, in-text citations and
+  everything from the bibliography on, then reports the total **by section and
+  sub-section** against `--limit`. Block quotes and body bullets do count; they
+  are assessed prose. Word's own count is wrong for IB and does not say which
+  section is bloated. `--json` emits the whole thing as one object for scripts
+  and agents.
 - `aidetect score` — the **desklib/ai-text-detector-v1.01** model (DeBERTa, #1
   on the RAID benchmark). Prints an AI score (0–1) per paragraph, flagging
   anything >= 0.5.
@@ -32,7 +34,9 @@ that need no model stay instant.
   the same set at 96%. Gemma 4 is a multimodal checkpoint, so `--mlx` loads it
   4-bit via mlx-vlm and runs it text-only, fitting an 18GB Mac in ~6GB. desklib
   stays primary; Binoculars is a usable second opinion rather than a dead end.
-- `aidetect extract` — strips a `.docx` down to finished prose for the scorers.
+- `aidetect extract` — writes the paragraphs `count` counted into a `.txt`
+  (`<name> prose.txt` unless you name one), so I can read what got counted. No
+  detector filtering happens here; `score` applies its own.
 - `aidetect calibrate` — refits a Binoculars threshold on a labelled set you
   name via `--human-dir`/`--ai-dir`, and writes it to `~/.config/aidetect`.
 - `fast-ai-detector/` — a separate, lighter tool ([Ejhfast/fast-ai-detector])
@@ -46,6 +50,11 @@ that need no model stay instant.
 - **`corpora/` does not ship.** It is 12 real students' Extended Essays plus
   matched LLM imitations. Fine in a repo, not something to push through PyPI on
   every install. `calibrate` therefore requires explicit folder arguments.
+- **One walker, two filters.** `walk()` in `text.py` applies the structure
+  rules once, and `count`, `extract` and `score` all read the document through
+  it. Each job then layers its own filter: `count` strips in-text citations,
+  the detector adds a 25-word style floor. Before this, each command filtered
+  the document its own way and one file got three different answers.
 - **`text.py` is torch-free on purpose.** `count` must not pay a ~2s model
   import to count words, and the split is enforced by a check in `tests/`.
 - **The MLX cache stays at `~/.cache/ai-detect-mlx`** despite the rename.
