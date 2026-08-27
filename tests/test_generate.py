@@ -139,6 +139,23 @@ def test_trim_keeps_whole_sentences_within_budget():
     assert trim_to_words(text, 100) == text
 
 
+def test_a_truncated_tail_is_dropped_not_saved():
+    """Every human sample ends in a full stop by construction. An AI sample cut
+    off mid-clause by a token limit would hand the detector a difference about
+    truncation rather than authorship, so the fragment goes."""
+    cut_off = ("The dispute reshaped public trust in the courts. By examining "
+               "the rhetorical strategies, the legal repercussions of his")
+    assert trim_to_words(cut_off, 200) == "The dispute reshaped public trust in the courts."
+    # nothing survives -> the caller's word floor rejects it and asks again
+    assert trim_to_words("only an unfinished clause with no stop", 200) == ""
+
+
+def test_a_self_reported_word_count_is_stripped():
+    """Observed in a real sample: '... that sustain exclusion. (110 words)'."""
+    annotated = "Progress demands addressing the entrenched factors. (110 words)"
+    assert trim_to_words(annotated, 200) == "Progress demands addressing the entrenched factors."
+
+
 def test_no_key_is_an_error_not_a_silent_skip():
     src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
     env = {k: v for k, v in os.environ.items() if k != "NVIDIA_API_KEY"}

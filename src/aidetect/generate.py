@@ -301,6 +301,15 @@ def looks_like_prose(text):
     return not any(marker in opening for marker in META_MARKERS)
 
 
+# A model sometimes annotates its own answer: "... sustain exclusion. (110 words)".
+# That is commentary, not essay prose.
+WORD_COUNT_NOTE = re.compile(r"\s*\(\s*(?:about\s*|approx\.?\s*|~\s*)?\d+\s*words?\s*\)\s*$",
+                             re.IGNORECASE)
+
+# A finished sentence ends in a stop, allowing for a closing quote or bracket.
+ENDS_A_SENTENCE = re.compile(r"[.!?][\"\u201d\')\]]?$")
+
+
 def trim_to_words(text, budget):
     """Keep whole sentences up to roughly `budget` words.
 
@@ -311,6 +320,7 @@ def trim_to_words(text, budget):
 
     Whole sentences only, and never a rewrite: this excerpts, it does not edit.
     """
+    text = WORD_COUNT_NOTE.sub("", text.strip())
     sentences = [s for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
     kept, count = [], 0
     for sentence in sentences:
@@ -318,6 +328,16 @@ def trim_to_words(text, budget):
         count += len(sentence.split())
         if count >= budget:
             break
+
+    # Drop a trailing fragment with no full stop. A model that hits its token
+    # limit stops mid-clause, and that fragment would otherwise be saved as a
+    # sample. It matters because EVERY human sample ends in a full stop by
+    # construction, so an AI class where some do not hands the detector a
+    # difference that is about truncation, not authorship. Emptying the list
+    # here is fine: the MIN_SAMPLE_WORDS floor then rejects the answer and the
+    # caller asks again.
+    while kept and not ENDS_A_SENTENCE.search(kept[-1]):
+        kept.pop()
     return " ".join(kept)
 
 
