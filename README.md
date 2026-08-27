@@ -165,8 +165,12 @@ together and takes the worse verdict per sentence.
 | `src/aidetect/generate.py` | generates the AI half of a calibration set through NVIDIA NIM, with no system prompt and no style guidance, so the adversary stays fair |
 | `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package |
 | `src/aidetect/thresholds/` | the thresholds shipped with the package; a threshold you fit yourself wins over these |
-| `corpora/` | labelled calibration sets: `human`/`ai` (humanities) and `human-tech`/`ai-tech` (maths, CS, science), plus `peer` for genre context. Repo-only, deliberately not shipped in the package |
-| `tests/` | count rules, Binoculars math and segment windows, all self-checking, no model download |
+| `corpora/` | labelled calibration sets: `human`/`ai` (humanities) and `human-tech`/`ai-tech` (maths, CS, science), plus `peer` for genre context. Repo-only, deliberately not shipped in the package, and **not covered by this repo's MIT licence** — see `corpora/README.md` |
+| `tools/ocr.swift` | macOS Vision OCR for one page image; prints text plus line geometry as TSV |
+| `tools/build_corpus.py` | turns scanned Extended Essays into corpus samples: paragraphs rebuilt from line geometry, footnote superscripts stripped, three paragraphs picked per essay |
+| `tools/ocr_bias.py` | measures what OCR does to a score, on the same prose read both ways |
+| `tests/` | count rules, Binoculars math, segment windows, corpus stripping and calibration grouping, all self-checking, no model download |
+| `tests/fixtures/known_clean/` | the 24 hand-picked samples that predate the OCR pipeline; the strip rules must never edit them |
 | `pyproject.toml` | package metadata and dependencies — torch · transformers · python-docx, plus mlx-vlm on Apple Silicon |
 
 ## 🔭 Binoculars: shelved, then revived by Gemma 4
@@ -177,9 +181,13 @@ text through two LMs that share a tokenizer (a base "observer" and an instruct
 is Falcon-7B ×2 (~28GB) — too big for an 18GB Mac, so the fallback was a small
 same-family pair (Qwen2.5-0.5B or 1.5B) that fits.
 
-`aidetect calibrate` scores a labelled set — mine is 12 real pre-2020 IB Extended
-Essay paragraphs vs 12 LLM-written ones on the same topics — and finds the best
-separating threshold. Measured across pairs:
+`aidetect calibrate` scores a labelled set and finds the best separating
+threshold. Mine is 132 paragraphs from 44 real pre-2020 IB Extended Essays,
+three per essay, against one LLM-written paragraph each on the same topic and
+from the same position in the essay.
+
+The pair comparison below was measured on the earlier 12-vs-12 set, and the
+shipped Binoculars thresholds still come from that fit:
 
 | pair | best separation | chance |
 |---|---|---|
@@ -215,11 +223,31 @@ aidetect generate --topics corpora/human-tech/manifest.json \
 ```
 
 By default it reads NIM's live catalog and **samples popular models across
-vendors**, one per topic — twelve topics typically means twelve different
-models from twelve vendors, so the class carries a spread of tokenizers,
+vendors**, one per topic, so the class carries a spread of tokenizers,
 architectures and training mixes rather than one model's habits. Models that
 NIM has stopped serving are dropped rather than 404-ing mid-run, `--seed` makes
-an assignment reproducible, and `--model` pins exact ids instead. The Gemma
+an assignment reproducible, and `--model` pins exact ids instead.
+
+When a human entry records a `position` (which third of the essay its paragraph
+came from), the prompt asks for that section. It is a structural instruction,
+the same kind as the word count, and it exists so the AI class carries the same
+introduction/analysis/conclusion spread the human class does. Without it every
+AI sample lands in the same generic mid-essay register, and that difference is
+learnable without being anything to do with human versus machine.
+
+`--workers` requests several completions at once, which matters when the usable
+models differ in speed by more than 10x: one large model can legitimately take
+around two minutes while others answer in ten seconds, and sequentially the slow
+ones block everything. Raise it too far and NIM answers 429. `--timeout` sets how
+long one completion may take; the default of 180s is deliberately generous
+because a tighter limit retires working models as though they were dead.
+
+Transient failures are counted **per sample, not per model**. A 429 says the
+account is over its rate limit and nothing about the model; a reasoning trace
+instead of a paragraph is one bad roll at temperature 1.0. Counting either over
+a model's whole run guarantees that any model which slips occasionally is
+retired somewhere in a long corpus, which silently collapses the class onto the
+two or three models that never slip. The Gemma
 family is never sampled: it is the detector's own pair, and scoring Gemma output
 with a Gemma observer/performer would flatter the detector.
 
@@ -242,7 +270,9 @@ sample, so any threshold fitted on it can be audited.
 The boundary is not only per model pair, it is **per genre**. Fitted on 12 real
 pre-2013 technical Extended Essay paragraphs (maths, CS, physics, chemistry,
 ITGS), human technical prose means **0.828** where humanities prose means
-**0.901**. The humanities threshold of 0.826 therefore sits almost exactly at the
+**0.901**. The corpus has since grown to 42 technical and 90 humanities
+paragraphs; these Binoculars numbers are the earlier fit and have not been
+refitted on it yet. The humanities threshold of 0.826 therefore sits almost exactly at the
 *mean* of genuine human technical writing, so a maths or CS essay flags roughly
 half its paragraphs no matter who wrote it.
 
@@ -275,6 +305,63 @@ rather than a dead end. The calibration sets are not shipped with the package �
 clone the repo to reproduce the numbers, or point `--human-dir`/`--ai-dir` at
 your own. Your fitted threshold lands in `~/.config/aidetect` and takes
 precedence over the shipped one, so it survives an upgrade.
+
+### Three paragraphs per essay, and why they are grouped
+
+The human corpora are built from scans. The IBO *50 Excellent Extended Essays*
+PDFs are page images, so `pdftotext` returns the running header and nothing else.
+`tools/build_corpus.py` renders each page at 200 dpi, OCRs it with macOS Vision,
+and rebuilds paragraphs from line geometry: in a justified academic scan the
+reliable signal is the vertical gap, since body lines step about 0.029 of page
+height and a paragraph break about 0.061, while indentation is lost in the noise.
+
+Footnote superscripts fuse to the word before them when OCR'd (`walnuts"|8`), so
+those are stripped by rules that `tests/test_build_corpus.py` proves are a
+byte-level no-op on all 24 samples that were hand-picked before the pipeline
+existed. Nothing else edits the prose. Letting a model tidy OCR damage would put
+model-shaped writing into the human class, which is the same contamination the
+generator refuses for the AI class, mirrored and worse.
+
+Three paragraphs per essay, one from each third of the body, because the desklib
+amber band is a 90th percentile of human window scores and a dozen windows cannot
+support a percentile. Three rather than more because roughly 8% of a 4000-word
+essay is a defensible excerpt.
+
+Paragraphs by one author are **not independent observations**, so `calibrate`
+groups samples by the digits in their id (`h07a`, `h07b`, `h07c` and their
+matching `a07a`, `a07b`, `a07c` are all essay `07`) and reports two numbers:
+
+```
+    in-sample separation: 95.5%  <- training fit, always optimistic
+    leave-one-essay-out: 91.7%  over 44 essays  <- report this one
+```
+
+The shipped threshold is still fitted on everything; only the accuracy is
+cross-validated. The held-out essay takes its AI samples with it, because
+leaving them in would leak the essay's topic into the training set. Each
+threshold file now records `n_essays` beside `n_human`, since the essay count is
+the real sample size.
+
+The amber edge is a percentile too, not a minimum. A minimum only ever moves down
+as more samples are drawn, so the band would widen at every recalibration without
+anything having been learned.
+
+### What OCR does to a score
+
+Measured rather than assumed, on 17 paragraphs read both ways — once from a
+born-digital PDF's text layer, once by OCR of the same rendered pages:
+
+| | gemma-mlx score |
+|---|---|
+| clean text layer, mean | 0.9111 |
+| OCR of the same pages, mean | 0.9040 |
+| **mean delta** | **-0.0071** |
+
+Median character error rate 2.33%. OCR moves human prose slightly toward the
+machine side, about 3.4% of the gap between the class means. Small, but the
+unhelpful direction: a human class shifted down drags the cutoff down with it,
+and a lower cutoff is a more lenient detector. Seventeen pairs from two essays
+supports a direction, not a precise effect size.
 
 ## 🧪 The peer set: genre context, not a human class
 

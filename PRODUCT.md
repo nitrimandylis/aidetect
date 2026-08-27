@@ -47,11 +47,20 @@ that need no model stay instant.
 - `aidetect calibrate` — refits a Binoculars threshold on a labelled set you
   name via `--human-dir`/`--ai-dir`, and writes it to `~/.config/aidetect`. It
   also fits the desklib amber band on the same human folder. `--tag` keeps a
-  genre calibration beside the default instead of overwriting it.
+  genre calibration beside the default instead of overwriting it. Samples are
+  grouped by the essay they came from, so the reported accuracy is
+  leave-one-essay-out rather than the training fit, and each threshold file
+  records `n_essays` beside `n_human`.
 - `aidetect generate` — builds the AI half of a calibration set by calling
   hosted models through NVIDIA NIM with no system prompt and no style guidance.
-  The only subcommand that uses the network at run time, and the only one
-  needing a key (`NVIDIA_API_KEY`, read from the environment, never stored).
+  Prompts carry the essay position of the human paragraph they match, which is
+  structural rather than stylistic. `--workers` runs several completions at once
+  and `--timeout` sets how long one may take. The only subcommand that uses the
+  network at run time, and the only one needing a key (`NVIDIA_API_KEY`, read
+  from the environment, never stored).
+- `tools/` — repo-only, not shipped. `build_corpus.py` turns scanned Extended
+  Essays into corpus samples through macOS Vision OCR, and `ocr_bias.py`
+  measures what that transcription does to a score.
 - `fast-ai-detector/` — a separate, lighter tool ([Ejhfast/fast-ai-detector])
   to cross-check. Not vendored, gitignored, its own CLI.
 
@@ -99,5 +108,12 @@ that need no model stay instant.
   quirks are not encoded; check your own subject guide for the limit itself.
 - Citation stripping keys on a year, `ibid` or `et al` inside parentheses. A
   citation style that uses none of those is not detected and will be counted.
+- The human corpora are transcribed from scans, and OCR shifts a Binoculars
+  score by about -0.007 against the same prose read from a text layer, roughly
+  3.4% of the gap between the class means. Small, but toward leniency.
+- The desklib amber band is empty for humanities prose and will stay that way.
+  With 95 windows behind it the human 90th percentile is 0.6013, above desklib's
+  own 0.5 boundary, so desklib flags more than a tenth of provably human 2008
+  Extended Essay prose. That is a limit of the model, not of the corpus.
 
 [Ejhfast/fast-ai-detector]: https://github.com/Ejhfast/fast-ai-detector

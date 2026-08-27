@@ -105,11 +105,16 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
   windows, Binoculars scores whole paragraphs, and the union takes the worse of
   the two. A sentence can therefore be red because the paragraph around it is
   red. The printed score is always desklib's.
-- **An empty amber band is a finding, not a bug.** `check` and `score --segments`
-  print a line when over 10% of the human calibration windows land in desklib's
-  red zone, which is currently the case: real human EE prose routinely scores
-  above 0.5 on desklib. Repeat that caveat rather than presenting desklib's red
-  percentage as if it were clean evidence.
+- **An empty amber band is a finding, not a bug, and it now depends on the tag.**
+  `check` and `score --segments` print a line when over 10% of the human
+  calibration windows land in desklib's red zone. That is still the case for the
+  default humanities band (p90 0.6013 over 95 windows, so the edge clamps to red
+  and the band is empty), and repeating that caveat matters: real human EE prose
+  routinely scores above 0.5 on desklib. It is **no longer** the case for
+  `--tag tech`, which has a real band from 0.4215 up to red, fitted on 42
+  windows. Both p90 figures fell a long way when the corpus grew from a dozen
+  windows, so the older, higher numbers were inflated rather than merely
+  imprecise.
 - **`count` strips a parenthetical only if it holds a 4-digit year, `ibid` or
   `et al`.** A citation style using none of those is counted as prose, which
   inflates the total. Say so if the draft's citations look unusual.
