@@ -36,6 +36,13 @@ aidetect = "aidetect.cli:main"
 packages = ["src/aidetect"]
 
 [tool.hatch.build.targets.sdist]
-# corpora/ is 12 real students' Extended Essays plus LLM imitations, and the
-# *-clean.txt files are my own drafts. Repo-only, never redistributed.
-exclude = ["corpora", "*-clean.txt", "fast-ai-detector"]
+# corpora/ is short excerpts from 44 real students' Extended Essays plus LLM
+# imitations, and the *-clean.txt files are my own drafts. Repo-only.
+#
+# tests/ is excluded for the same reason, not for tidiness: tests/fixtures/
+# holds 24 of those same excerpts, so shipping the tests would redistribute
+# exactly the material corpora/ is withheld to avoid redistributing.
+#
+# tools/ is the corpus-building pipeline. It is macOS-only (Vision, swiftc) and
+# nothing in the package imports it, so it is dead weight in a wheel.
+exclude = ["corpora", "tests", "tools", "*-clean.txt", "fast-ai-detector"]
