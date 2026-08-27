@@ -1,29 +1,14 @@
 # corpora/
 
-> **`ai/` and `ai-tech/` are STALE as of the human-corpus rebuild.**
+> **`ai/` and `ai-tech/` are being regenerated.**
 >
 > The human halves were rebuilt from 44 scanned IB exemplars (132 paragraphs,
-> three per essay). The AI halves still hold the previous 12-sample sets, whose
-> `matches` ids point at human samples that no longer exist. **Do not fit a
-> threshold until they are regenerated**, or the two classes will be scored
-> against unrelated topics.
->
-> Regeneration was blocked on the NVIDIA NIM free-tier rate limit, not on
-> anything in the code. When the quota resets:
->
-> ```
-> aidetect generate --topics corpora/human/manifest.json \
->     --out-dir corpora/ai --prefix a --seed 7 --workers 2
-> aidetect generate --topics corpora/human-tech/manifest.json \
->     --out-dir corpora/ai-tech --prefix ta --seed 7 --workers 2
-> ```
+> three per essay), so the previous 12-sample AI sets no longer match anything:
+> their `matches` ids point at human samples that do not exist. **Do not fit a
+> Binoculars threshold until the regenerated sets have landed**, or the two
+> classes will be scored against unrelated topics.
 >
 > The desklib amber bands do NOT depend on the AI half and are already refitted.
-
-
-The labelled set `aidetect calibrate` fits a threshold on. Not shipped in the
-wheel or the sdist (`pyproject.toml` excludes it), and not covered by this
-repository's MIT licence. See **Licensing** below.
 
 ## What is in here
 

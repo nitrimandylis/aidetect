@@ -127,7 +127,7 @@ all is counted whole, with a note, rather than reporting a confident zero.
 flowchart LR
     A[".docx"] --> B["walk()<br/>structure: drop cover, contents,<br/>headings, captions, bibliography"]
     B --> C["aidetect count<br/>strip citations,<br/>total by section"]
-    B --> P["is_prose()<br/>style floor: >= 25 words,<br/>no bullets or scaffolding"]
+    B --> P["is_prose()<br/>style floor: >= 25 words,<br/>no lists, tables or scaffolding"]
     B --> S["sentence windows<br/>7 sentences, stride 3<br/>no length floor"]
     P --> D1["desklib DeBERTa<br/>per paragraph"]
     P --> BN["Binoculars<br/>Gemma 4 pair<br/>per paragraph"]

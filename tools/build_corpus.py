@@ -73,6 +73,11 @@ SHREDDED = re.compile(r"(?:\b\w\b[ .]){3,}")
 
 MIN_WORDS, MAX_WORDS = 60, 160
 
+# The subject comes from the PDF's filename, and the IBO collection misspells
+# one of them ("Mathmatics_1.pdf"). The corpus should record the subject, not
+# the archive's typo.
+SUBJECT_SPELLINGS = {"Mathmatics": "Mathematics"}
+
 
 def strip_markers(text):
     """Remove OCR'd footnote superscripts. Keeps the quote, drops the marker."""
@@ -371,6 +376,7 @@ def main(argv=None):
             continue
         number += 1
         subject = re.sub(r"_\d+$", "", name).replace("_", " ")
+        subject = SUBJECT_SPELLINGS.get(subject, subject)
         for letter, (index, text, position) in zip("abc", picked):
             sample_id = f"{args.prefix}{number:02d}{letter}"
             if not args.dry_run:
