@@ -13,9 +13,10 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from aidetect.generate import (POPULAR_MODELS, PROMPT_TEMPLATE, build_prompt,  # noqa: E402
-                               clean, looks_like_prose, pick_models,
-                               trim_to_words, vendor_of)
+from aidetect.generate import (POPULAR_MODELS, POSITIONED_TEMPLATE,  # noqa: E402
+                               PROMPT_TEMPLATE, build_prompt, clean,
+                               looks_like_prose, pick_models, trim_to_words,
+                               vendor_of)
 
 
 def test_prompt_carries_topic_and_length_only():
@@ -31,9 +32,24 @@ def test_prompt_has_no_style_guidance():
     banned = ("style", "tone", "voice", "concise", "formal", "academic voice",
               "avoid", "do not use", "em dash", "active voice", "like a student",
               "human", "natural")
-    lowered = PROMPT_TEMPLATE.lower()
-    for word in banned:
-        assert word not in lowered, f"prompt template steers style: {word!r}"
+    # Both templates. The positioned one adds a structural hint (which section
+    # of the essay to write), which is allowed for the same reason the word
+    # count is: it says what to produce, not how to write it. This test is what
+    # keeps that distinction from eroding into style guidance later.
+    for template in (PROMPT_TEMPLATE, POSITIONED_TEMPLATE):
+        lowered = template.lower()
+        for word in banned:
+            assert word not in lowered, f"prompt template steers style: {word!r}"
+
+
+def test_position_is_structural_and_optional():
+    """A missing position must generate exactly as it did before positions
+    existed, so an older topics file is unaffected."""
+    with_position = build_prompt("Alhazen's billiard problem", 110, "conclusion")
+    without = build_prompt("Alhazen's billiard problem", 110)
+    assert "conclusion section" in with_position
+    assert without == PROMPT_TEMPLATE.format(topic="Alhazen's billiard problem", words=110)
+    assert "section" not in without
 
 
 def test_clean_strips_wrapper_but_not_prose():

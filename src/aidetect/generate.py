@@ -81,12 +81,30 @@ POPULAR_MODELS = [
     "zyphra/zamba2-7b-instruct",
 ]
 
-# The whole point: topic and length, nothing about tone, register or style.
-# Do NOT add "write like a student" or any style hint here. Any styling makes
-# the adversary weaker and the threshold more lenient.
+# The whole point: topic, length and position, nothing about tone, register or
+# style. Do NOT add "write like a student" or any style hint here. Any styling
+# makes the adversary weaker and the threshold more lenient.
 PROMPT_TEMPLATE = (
     "Write a single paragraph of about {words} words from an IB Extended Essay "
     "on the following topic:\n\n{topic}\n\n"
+    "Return only the paragraph itself, with no title, heading or commentary."
+)
+
+# Used when the human entry records WHERE in the essay its paragraph came from.
+#
+# This is structural, not stylistic, and the distinction is the whole reason it
+# is allowed here. It says which part of an essay to write, exactly like the
+# word count says how long. It does not say how to write.
+#
+# It exists because the human samples are drawn one per third of the body, so
+# they carry the register spread a real essay has: a framing paragraph, an
+# analytical one, a closing one. Prompting every AI sample identically would
+# leave the AI class uniformly mid-essay, and that difference is learnable
+# without being anything to do with human versus machine. If anything this
+# makes the adversary stronger, because a real conclusion is formulaic too.
+POSITIONED_TEMPLATE = (
+    "Write a single paragraph of about {words} words from the {position} section "
+    "of an IB Extended Essay on the following topic:\n\n{topic}\n\n"
     "Return only the paragraph itself, with no title, heading or commentary."
 )
 
@@ -96,7 +114,15 @@ RATE_LIMIT_RETRIES = 3    # a 429 means "slow down", not "this model is unusable
 RATE_LIMIT_BACKOFF = 20   # seconds, multiplied by the attempt number
 
 
-def build_prompt(topic, words):
+def build_prompt(topic, words, position=None):
+    """The prompt for one sample.
+
+    Falls back to the position-free template when the human entry does not say
+    where its paragraph came from, so a set built before positions were
+    recorded, or someone else's topics file, generates exactly as it used to.
+    """
+    if position:
+        return POSITIONED_TEMPLATE.format(topic=topic, words=words, position=position)
     return PROMPT_TEMPLATE.format(topic=topic, words=words)
 
 
@@ -309,10 +335,20 @@ def main(argv=None):
     for index, entry in enumerate(topics):
         human_id = entry["id"]
         # th01 -> ta01: keep the number, swap the prefix, so the pairing is obvious
-        number = "".join(c for c in human_id if c.isdigit())
-        out_id = f"{args.prefix}{number}"
+        # th07a -> ta07a: keep the essay number AND the paragraph letter, so the
+        # pairing stays obvious and calibrate groups both halves by the same essay.
+        number = ""
+        for character in human_id:
+            if character.isdigit():
+                number += character
+        # older single-paragraph ids (h01) end in a digit and have no letter
+        letter = ""
+        if human_id[-1].isalpha() and number:
+            letter = human_id[-1]
+        out_id = f"{args.prefix}{number}{letter}"
         model = models[index]
-        prompt = build_prompt(entry["topic"], args.words)
+        position = entry.get("position")
+        prompt = build_prompt(entry["topic"], args.words, position)
 
         # The catalog lists what NIM serves, not what THIS account may call, so a
         # model can still 404. Swap it for another vendor's and carry on: aborting
@@ -382,10 +418,11 @@ def main(argv=None):
             "matches": human_id,
             "subject": entry.get("subject"),
             "topic": entry["topic"],
+            "position": position,
             "generated_by": model,
             "vendor": vendor_of(model),
             "temperature": TEMPERATURE,
-            "prompt_template": PROMPT_TEMPLATE,
+            "prompt_template": POSITIONED_TEMPLATE if position else PROMPT_TEMPLATE,
             "words_requested": args.words,
             "words_kept": len(text.split()),
             "seed": args.seed,
