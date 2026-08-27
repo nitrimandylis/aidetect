@@ -37,6 +37,8 @@ def main(argv=None):
                     help="Binoculars model pair (default %(default)s, the calibrated one)")
     ap.add_argument("--mlx", action=argparse.BooleanOptionalAction, default=apple_silicon,
                     help="use the 4-bit MLX backend (default: on for Apple Silicon)")
+    ap.add_argument("--tag", default=None,
+                    help="genre tag, e.g. 'tech': judge against thresholds calibrated with the same --tag")
     args = ap.parse_args(argv)
 
     # min_words=0: short connective paragraphs are scored too — by the desklib
@@ -51,7 +53,7 @@ def main(argv=None):
     device = detect.pick_device()
     print(f"[1/2] desklib segments on {device}...")
     tokenizer, model = detect.load_model(device)
-    red, amber, fitted = detect.load_desklib_band()
+    red, amber, fitted = detect.load_desklib_band(args.tag)
     detect.band_note(red, amber, fitted)
     sentences, desklib_scores = detect.score_windows(paragraphs, tokenizer, model, device)
     desklib_statuses = [classify(score, red, amber) for score in desklib_scores]
@@ -62,11 +64,12 @@ def main(argv=None):
     print("[2/2] Binoculars...")
     backend_args = argparse.Namespace(pair=args.pair, mlx=args.mlx)
     pair_key, backend, bdevice, btokenizer, observer, performer = bino.load_backend(backend_args)
-    saved = bino.load_saved(pair_key, backend)
+    saved = bino.load_saved(pair_key, backend, args.tag)
     bino_threshold = saved.get("threshold", bino.DEFAULT_THRESHOLD)
     bino_amber = saved.get("amber")
     if "threshold" not in saved:
-        print(f"warning: pair {pair_key!r} was never calibrated, using placeholder {bino_threshold}")
+        what = f"pair {pair_key!r} with tag {args.tag!r}" if args.tag else f"pair {pair_key!r}"
+        print(f"warning: {what} was never calibrated, using placeholder {bino_threshold}")
 
     paragraph_status = {}
     for number, paragraph in enumerate(paragraphs):

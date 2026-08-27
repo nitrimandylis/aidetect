@@ -15,6 +15,7 @@ COMMANDS = {
     "bino":      ("aidetect.binoculars", "second opinion via Binoculars (needs a model pair)"),
     "extract":   ("aidetect.extract",    "pull finished prose out of a .docx into a .txt"),
     "calibrate": ("aidetect.calibrate",  "fit a Binoculars threshold on your own labelled set"),
+    "generate":  ("aidetect.generate",   "generate the AI half of a calibration set (NVIDIA NIM)"),
 }
 
 USAGE = "usage: aidetect <command> [options]\n\ncommands:\n" + "".join(

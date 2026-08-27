@@ -84,15 +84,17 @@ def score_text(text, tokenizer, model, device):
         return torch.sigmoid(logits).item()
 
 
-def load_desklib_band():
+def load_desklib_band(tag=None):
     """The red/amber boundaries for segment scoring.
 
     red is the model's own 0.5. amber comes from threshold-desklib.json, which
     `aidetect calibrate` fits from the human corpus (see fit_desklib_amber);
-    until that has run, a fixed 0.35 stands in. Returns (red, amber, fitted)."""
+    until that has run, a fixed 0.35 stands in. A genre tag selects the band
+    fitted with the same --tag. Returns (red, amber, fitted)."""
     import json
     from .paths import threshold_path, user_threshold_path
-    for path in (user_threshold_path("desklib"), threshold_path("desklib")):
+    name = f"desklib-{tag}" if tag else "desklib"
+    for path in (user_threshold_path(name), threshold_path(name)):
         if path and os.path.exists(path):
             data = json.load(open(path))
             return (data.get("threshold", RED_DEFAULT),
@@ -122,11 +124,11 @@ def band_note(red, amber, fitted):
               "desklib's red zone, so no edge below red is meaningful")
 
 
-def segment_report(paragraphs, tokenizer, model, device):
+def segment_report(paragraphs, tokenizer, model, device, tag=None):
     if not paragraphs:
         print("No prose found.")
         return
-    red, amber, fitted = load_desklib_band()
+    red, amber, fitted = load_desklib_band(tag)
     band_note(red, amber, fitted)
     sentences, scores = score_windows(paragraphs, tokenizer, model, device)
     statuses = [classify(score, red, amber) for score in scores]
@@ -160,6 +162,8 @@ def main(argv=None):
     ap.add_argument("--text", help="score a single string instead of a file")
     ap.add_argument("--segments", action="store_true",
                     help="score overlapping sentence windows (Turnitin-shaped) instead of paragraphs")
+    ap.add_argument("--tag", default=None,
+                    help="genre tag, e.g. 'tech': use the amber band calibrated with the same --tag")
     args = ap.parse_args(argv)
 
     if not args.path and not args.text:
@@ -173,7 +177,7 @@ def main(argv=None):
         # min_words=0: short paragraphs are the point of segment mode, they
         # ride inside windows instead of being skipped as noise
         paragraphs = [args.text] if args.text else read_paragraphs(args.path, min_words=0)
-        segment_report(paragraphs, tokenizer, model, device)
+        segment_report(paragraphs, tokenizer, model, device, args.tag)
     elif args.text:
         prob = score_text(args.text, tokenizer, model, device)
         print(f"AI score: {prob:.2f}  [{bar(prob)}]")

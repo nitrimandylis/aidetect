@@ -63,7 +63,7 @@ def pick_threshold(human_scores, ai_scores):
     return cutoff, acc
 
 
-def fit_desklib_amber(human_dir):
+def fit_desklib_amber(human_dir, tag=None):
     """Fit the amber edge for `aidetect score --segments` on the human corpus.
 
     Scores every sentence window of every human .txt with desklib and takes the
@@ -104,7 +104,7 @@ def fit_desklib_amber(human_dir):
         "human_p90": round(p90, 4),
     }
     ensure_user_dir()
-    path = user_threshold_path("desklib")
+    path = user_threshold_path(f"desklib-{tag}" if tag else "desklib")
     json.dump(out, open(path, "w"), indent=2)
     print(f"    desklib amber edge: {amber}  ({len(window_scores)} human windows)")
     print(f"    saved -> {path}")
@@ -169,14 +169,14 @@ def main(argv=None):
         "ai_mean": round(sum(ai_scores)/len(ai_scores), 4),
     }
     ensure_user_dir()
-    thr_path = user_threshold_path(pair_tag(pair_key, backend))
+    thr_path = user_threshold_path(pair_tag(pair_key, backend, args.tag))
     json.dump(out, open(thr_path, "w"), indent=2)
     print(f"    saved -> {thr_path}")
 
     # --- fit the desklib amber band on the same human folder ---
     # Runs every calibration: it is idempotent, and calibrate is the only
     # command that ever sees the human corpus.
-    fit_desklib_amber(args.human_dir)
+    fit_desklib_amber(args.human_dir, args.tag)
 
     # --- run the calibrated check on a draft ---
     if args.check:

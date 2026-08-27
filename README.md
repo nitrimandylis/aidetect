@@ -70,7 +70,7 @@ uv tool install aidetect      # or: pipx install aidetect
 ```
 
 ```bash
-aidetect                                   # list the six subcommands
+aidetect                                   # list the seven subcommands
 aidetect count "draft.docx" --limit 4000   # IB word count, by section
 aidetect count "draft.docx" --json         # same, as one JSON object
 aidetect extract "draft.docx"              # -> "draft prose.txt", what got counted
@@ -147,6 +147,7 @@ the detector, which is the whole reason the split exists.
 | `src/aidetect/extract.py` | dumps a `.docx`'s countable prose into a `.txt`, the same words `count` counts |
 | `src/aidetect/binoculars.py` | training-free perplexity-ratio scorer over a base+instruct LM pair (Qwen, or Gemma 4 via `--mlx`; see below) |
 | `src/aidetect/calibrate.py` | fits a threshold on a labelled set you supply, saves it to `~/.config/aidetect` |
+| `src/aidetect/generate.py` | generates the AI half of a calibration set through NVIDIA NIM, with no system prompt and no style guidance, so the adversary stays fair |
 | `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package |
 | `src/aidetect/thresholds/` | the thresholds shipped with the package; a threshold you fit yourself wins over these |
 | `corpora/` | my labelled calibration sets. Repo-only, deliberately not shipped in the package |
@@ -185,6 +186,33 @@ aidetect bino IA-clean.txt --mlx --pair gemma   # uses the shipped threshold
 # refit the threshold on your own labelled set
 aidetect calibrate --human-dir corpora/human --ai-dir corpora/ai --mlx --pair gemma
 ```
+
+### The AI class has to be a fair adversary
+
+`aidetect generate` builds the AI half of a calibration set by calling a hosted
+model through [NVIDIA NIM](https://build.nvidia.com) with **no system prompt and
+no style guidance** — only a topic and a word count:
+
+```bash
+export NVIDIA_API_KEY=nvapi-...     # you set it; aidetect only reads the env var
+aidetect generate --topics corpora/human-tech/manifest.json \
+                  --out-dir corpora/ai-tech --prefix ta \
+                  --model meta/llama-3.3-70b-instruct --model mistralai/mistral-large
+```
+
+This exists because of a real failure. An earlier AI set was written by an
+assistant carrying house style rules (write tightly, no em dashes, active voice)
+and came out stylometrically *indistinguishable from the human class* it was
+supposed to oppose — mean sentence length 25.8 against the humans' 24.5, where a
+properly untuned AI class ran to 35.1. A too-human AI class pulls the clusters
+together, lowers the threshold and makes the detector **more lenient**, which is
+the false-negative direction this tool exists to avoid. That set is quarantined
+in `corpora/ai-tech/` with the numbers written down.
+
+Repeat `--model` to rotate models across topics so the class is not one model's
+quirks, and prefer a family different from the detector's own pair. The output
+manifest records the model, temperature and exact prompt template for every
+sample, so any threshold fitted on it can be audited.
 
 desklib stays the primary detector; Binoculars is now a usable second opinion
 rather than a dead end. The calibration sets are not shipped with the package —

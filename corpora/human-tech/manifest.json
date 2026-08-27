@@ -1,0 +1,98 @@
+[
+  {
+    "id": "th01",
+    "subject": "Mathematics",
+    "topic": "Whether a 3m x 3m field seeded with two weed parcels can become entirely overgrown",
+    "source_url": "https://web.archive.org/web/2015/http://www.easthartford.org/uploaded/ciba/Mathmatics_1.pdf",
+    "date_evidence": "IBO '50 Excellent Extended Essays'; '(c) International Baccalaureate Organization 2008' printed on every page; PDF metadata CreationDate D:20080211. Wayback capture of the source folder 2015-12-27.",
+    "extraction": "scanned PDF, transcribed with macOS Vision OCR, one body paragraph selected by hand"
+  },
+  {
+    "id": "th02",
+    "subject": "Mathematics",
+    "topic": "Alhazen's billiard problem and reflection within a circle",
+    "source_url": "https://web.archive.org/web/2015/http://www.easthartford.org/uploaded/ciba/Mathmatics_2.pdf",
+    "date_evidence": "IBO '50 Excellent Extended Essays'; '(c) International Baccalaureate Organization 2008' printed on every page; PDF metadata CreationDate D:20080229. Essay's own citations accessed 2005.",
+    "extraction": "scanned PDF, transcribed with macOS Vision OCR, one body paragraph selected by hand"
+  },
+  {
+    "id": "th03",
+    "subject": "Mathematics",
+    "topic": "The 3n+1 (Collatz) conjecture and the behaviour of its stopping time function",
+    "source_url": "https://web.archive.org/web/2015/http://www.easthartford.org/uploaded/ciba/Mathmatics_3.pdf",
+    "date_evidence": "IBO '50 Excellent Extended Essays'; '(c) International Baccalaureate Organization 2008' printed on every page; PDF metadata CreationDate D:20080215.",
+    "extraction": "scanned PDF, transcribed with macOS Vision OCR, one body paragraph selected by hand"
+  },
+  {
+    "id": "th04",
+    "subject": "Mathematics",
+    "topic": "Game-theoretic analysis of two-person zero-sum poker models",
+    "source_url": "https://web.archive.org/web/2015/http://www.easthartford.org/uploaded/ciba/Mathmatics_4.pdf",
+    "date_evidence": "IBO '50 Excellent Extended Essays'; '(c) International Baccalaureate Organization 2008' printed on every page; PDF metadata CreationDate D:20080229.",
+    "extraction": "scanned PDF, transcribed with macOS Vision OCR, one body paragraph selected by hand"
+  },
+  {
+    "id": "th05",
+    "subject": "Chemistry",
+    "topic": "Optical rotation of mixed glucose and fructose solutions measured by polarimetry",
+    "source_url": "https://web.archive.org/web/2015/http://www.easthartford.org/uploaded/ciba/Chemistry_3.pdf",
+    "date_evidence": "IBO '50 Excellent Extended Essays'; '(c) International Baccalaureate Organization 2008' printed on every page; PDF metadata CreationDate D:20080310.",
+    "extraction": "scanned PDF, transcribed with macOS Vision OCR, one body paragraph selected by hand"
+  },
+  {
+    "id": "th06",
+    "subject": "ITGS",
+    "topic": "Economic factors behind the digital divide in India",
+    "source_url": "https://web.archive.org/web/2015/http://www.easthartford.org/uploaded/ciba/ITGS_1.pdf",
+    "date_evidence": "IBO '50 Excellent Extended Essays'; '(c) International Baccalaureate Organization 2008' printed on every page; PDF metadata CreationDate D:20080221.",
+    "extraction": "scanned PDF, transcribed with macOS Vision OCR, one body paragraph selected by hand"
+  },
+  {
+    "id": "th07",
+    "subject": "Physics",
+    "topic": "How bow efficiency changes as draw length increases",
+    "source_url": "https://bpb-ap-se2.wpmucdn.com/learn.stleonards.vic.edu.au/dist/c/190/files/2012/08/IB_EE_Physics_Anon1l_with-comments.pdf",
+    "date_evidence": "IBO '50 More Excellent Extended Essays'; '(c) International Baccalaureate Organization 2011' printed on every page; PDF produced by Adobe InDesign with CreationDate D:20120813; hosted in a 2012/08 upload folder.",
+    "extraction": "scanned PDF, transcribed with macOS Vision OCR, one body paragraph selected by hand"
+  },
+  {
+    "id": "th08",
+    "subject": "Computer Science",
+    "topic": "Architecture of artificial neural networks compared with biological ones",
+    "source_url": "https://www.maths.tcd.ie/~atbates/mmi/IB_EE/group5/computer_science/exemplar-1.pdf",
+    "date_evidence": "IB Computer Science EE exemplar published alongside the May 2009 and November 2009 subject reports; PDF metadata CreationDate 2009-11-23; the essay's own bibliography cites sources accessed 04/07/2008.",
+    "extraction": "scanned PDF, transcribed with macOS Vision OCR, one body paragraph selected by hand"
+  },
+  {
+    "id": "th09",
+    "subject": "Computer Science",
+    "topic": "Whether quantum computers render current cryptographic methods useless (Shor's algorithm)",
+    "source_url": "https://plankenau.com/docs/Patricio_Lankenau-Extended_Essay.pdf",
+    "date_evidence": "Cover page states IB session May 2013; PDF metadata CreationDate D:20121213; captured on web.archive.org from 2014-11-14 onward, long before any LLM writing tool existed.",
+    "extraction": "born-digital PDF, text layer extracted with pypdf, one body paragraph selected by hand"
+  },
+  {
+    "id": "th10",
+    "subject": "Computer Science",
+    "topic": "Cellular automata as a way to simulate replicating, evolving organisms",
+    "source_url": "https://www.maths.tcd.ie/~atbates/mmi/IB_EE/group5/computer_science/exemplar-2.pdf",
+    "date_evidence": "IB Computer Science EE exemplar published alongside the May/November 2009 subject reports; cover page states 'IB Class of 2009'; PDF metadata CreationDate 2009-11-23.",
+    "extraction": "scanned PDF, transcribed with macOS Vision OCR, one body paragraph selected by hand"
+  },
+  {
+    "id": "th11",
+    "subject": "ITGS",
+    "topic": "Wireless in Local Loop as a way to bring telephony and internet to rural India",
+    "source_url": "https://web.archive.org/web/2015/http://www.easthartford.org/uploaded/ciba/ITGS_1.pdf",
+    "date_evidence": "Same source as th06: IBO '50 Excellent Extended Essays', 2008 copyright on every page, PDF CreationDate D:20080221. Different section of the essay.",
+    "extraction": "scanned PDF, transcribed with macOS Vision OCR, one body paragraph selected by hand"
+  },
+  {
+    "id": "th12",
+    "subject": "Chemistry",
+    "topic": "Presentation of polarimetry results for glucose and fructose mixtures",
+    "source_url": "https://web.archive.org/web/2015/http://www.easthartford.org/uploaded/ciba/Chemistry_3.pdf",
+    "date_evidence": "Same source as th05: IBO '50 Excellent Extended Essays', 2008 copyright on every page, PDF CreationDate D:20080310. Different section of the essay.",
+    "extraction": "scanned PDF, transcribed with macOS Vision OCR, one body paragraph selected by hand"
+  }
+]

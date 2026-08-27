@@ -64,11 +64,15 @@ MAX_LEN = 1024        # token window; longer paragraphs get truncated
 DEFAULT_THRESHOLD = 0.90
 
 
-def pair_tag(pair_key, backend):
-    return f"{pair_key}-mlx" if backend == "mlx" else pair_key
+def pair_tag(pair_key, backend, tag=None):
+    """Filename tag for a calibration: pair, backend, and optionally a genre
+    tag — thresholds fitted on a technical corpus live in their own file
+    (threshold-gemma-mlx-tech.json) so they never overwrite the default set."""
+    base = f"{pair_key}-mlx" if backend == "mlx" else pair_key
+    return f"{base}-{tag}" if tag else base
 
 
-def load_saved(pair_key, backend):
+def load_saved(pair_key, backend, tag=None):
     """Return the saved calibration dict for this pair, or {} if never
     calibrated. Holds "threshold" and, on newer files, "amber" (the score of
     the worst human calibration doc that still passed: anything between the
@@ -79,7 +83,7 @@ def load_saved(pair_key, backend):
     in the wheel, so recalibrating survives an upgrade.
     """
     import json
-    tag = pair_tag(pair_key, backend)
+    tag = pair_tag(pair_key, backend, tag)
     for path in (user_threshold_path(tag), threshold_path(tag)):
         if path and os.path.exists(path):
             return json.load(open(path))
@@ -123,6 +127,8 @@ def add_backend_args(ap):
                     help="model pair to use (default %(default)s)")
     ap.add_argument("--mlx", action="store_true",
                     help="use the 4-bit MLX gemma pair (Apple Silicon; needs mlx-vlm)")
+    ap.add_argument("--tag", default=None,
+                    help="genre tag, e.g. 'tech': use/save thresholds calibrated on that corpus")
 
 
 def load_backend(args):
@@ -238,7 +244,7 @@ def main(argv=None):
     pair_key, backend, device, tokenizer, observer, performer = load_backend(args)
 
     # explicit --threshold wins; else use the calibrated one; else Falcon's placeholder
-    saved = load_saved(pair_key, backend)
+    saved = load_saved(pair_key, backend, args.tag)
     threshold = args.threshold
     amber = saved.get("amber")
     if threshold is None:

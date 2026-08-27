@@ -1,0 +1,74 @@
+[
+  {
+    "id": "ta01",
+    "matches": "th01",
+    "subject": "Mathematics",
+    "topic": "Whether a 3m x 3m field seeded with two weed parcels can become entirely overgrown"
+  },
+  {
+    "id": "ta02",
+    "matches": "th02",
+    "subject": "Mathematics",
+    "topic": "Alhazen's billiard problem and reflection within a circle"
+  },
+  {
+    "id": "ta03",
+    "matches": "th03",
+    "subject": "Mathematics",
+    "topic": "The 3n+1 (Collatz) conjecture and the behaviour of its stopping time function"
+  },
+  {
+    "id": "ta04",
+    "matches": "th04",
+    "subject": "Mathematics",
+    "topic": "Game-theoretic analysis of two-person zero-sum poker models"
+  },
+  {
+    "id": "ta05",
+    "matches": "th05",
+    "subject": "Chemistry",
+    "topic": "Optical rotation of mixed glucose and fructose solutions measured by polarimetry"
+  },
+  {
+    "id": "ta06",
+    "matches": "th06",
+    "subject": "ITGS",
+    "topic": "Economic factors behind the digital divide in India"
+  },
+  {
+    "id": "ta07",
+    "matches": "th07",
+    "subject": "Physics",
+    "topic": "How bow efficiency changes as draw length increases"
+  },
+  {
+    "id": "ta08",
+    "matches": "th08",
+    "subject": "Computer Science",
+    "topic": "Architecture of artificial neural networks compared with biological ones"
+  },
+  {
+    "id": "ta09",
+    "matches": "th09",
+    "subject": "Computer Science",
+    "topic": "Whether quantum computers render current cryptographic methods useless (Shor's algorithm)"
+  },
+  {
+    "id": "ta10",
+    "matches": "th10",
+    "subject": "Computer Science",
+    "topic": "Cellular automata as a way to simulate replicating, evolving organisms"
+  },
+  {
+    "id": "ta11",
+    "matches": "th11",
+    "subject": "ITGS",
+    "topic": "Wireless in Local Loop as a way to bring telephony and internet to rural India"
+  },
+  {
+    "id": "ta12",
+    "matches": "th12",
+    "subject": "Chemistry",
+    "topic": "Presentation of polarimetry results for glucose and fructose mixtures"
+  }
+]
