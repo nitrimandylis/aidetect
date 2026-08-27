@@ -115,6 +115,15 @@ TEMPERATURE = 1.0   # the model's own default register; low temp writes flatter 
 RATE_LIMIT_RETRIES = 3    # a 429 means "slow down", not "this model is unusable"
 RATE_LIMIT_BACKOFF = 20   # seconds, multiplied by the attempt number
 
+# A model that answers with a reasoning trace instead of the paragraph has had
+# ONE bad roll, not a permanent fault: the nemotron models do it perhaps one
+# time in five and write perfectly good prose the rest of the time. Dropping
+# them on the first miss quietly collapsed the AI class onto the two or three
+# models that never slip, which is precisely the loss of vendor spread this
+# whole file exists to prevent. Temperature is 1.0, so a retry really is a
+# different roll.
+BAD_RESPONSE_RETRIES = 3
+
 
 def build_prompt(topic, words, position=None):
     """The prompt for one sample.
@@ -294,6 +303,7 @@ class ModelPool:
         self.lock = threading.Lock()
         self.unavailable = set()
         self.rate_limited = collections.Counter()
+        self.bad_responses = collections.Counter()
         self.vendor_counts = collections.Counter()
 
     def replacement_for(self, model):
@@ -313,6 +323,12 @@ class ModelPool:
         with self.lock:
             self.rate_limited[model] += 1
             return self.rate_limited[model]
+
+    def note_bad_response(self, model):
+        """Count one unusable answer from this model and return the new total."""
+        with self.lock:
+            self.bad_responses[model] += 1
+            return self.bad_responses[model]
 
     def note_use(self, model):
         with self.lock:
@@ -384,13 +400,18 @@ def generate_one(entry, model, models_state, api_key, args):
                 raise SystemExit(f"could not reach NIM: {error.reason}")
         else:
             if text and not looks_like_prose(text):
-                # a reasoning trace or a preamble leaked into content
-                print(f"      {model} answered with commentary, dropping it")
-                text = ""
+                text = ""          # a reasoning trace or a preamble leaked in
             if not text:
-                # answered, but with nothing usable (a refusal, or a reasoning
-                # model that put everything in reasoning_content)
-                print(f"      {model} returned no prose, dropping it")
+                # Answered, but with nothing usable: a refusal, a planning
+                # trace, or a reasoning model that put everything in
+                # reasoning_content. Retry the same model first — this is a bad
+                # roll, not a broken model.
+                attempts = models_state.note_bad_response(model)
+                if attempts <= BAD_RESPONSE_RETRIES:
+                    print(f"      {model} returned no prose, retrying "
+                          f"({attempts}/{BAD_RESPONSE_RETRIES})")
+                    continue
+                print(f"      {model} returned no prose {attempts} times, dropping it")
                 model = models_state.replacement_for(model)
 
     models_state.note_use(model)
