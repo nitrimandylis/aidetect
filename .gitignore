@@ -20,3 +20,6 @@ __pycache__/
 dist/
 *.egg-info/
 uv.lock
+
+# compiled by tools/run_ocr.sh from ocr.swift, never committed
+tools/ocr

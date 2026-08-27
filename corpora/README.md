@@ -54,6 +54,26 @@ postdates ChatGPT and none can be certified, so fitting on it would let
 AI-assisted text drag the human mean down. If peer samples are ever scored they
 are reported as a separate comparison row and never merged into `human`.
 
+## Rebuilding the human corpora from scratch
+
+Everything below runs from the repo, no manual steps:
+
+```bash
+tools/fetch_exemplars.sh scans          # 48 IBO exemplars from the Wayback Machine
+tools/ocr_all.sh scans                  # 200 dpi render + Vision OCR -> scans/tsv
+python3 tools/build_corpus.py --tsv-dir scans/tsv --out-dir corpora/human \
+    --prefix h --subjects English History Geography Philosophy Politics \
+                          Psychology Social Visual World Music
+python3 tools/build_corpus.py --tsv-dir scans/tsv --out-dir corpora/human-tech \
+    --prefix th --subjects Biology Chemistry Physics Mathmatics ITGS
+```
+
+`tools/ocr` is compiled from `ocr.swift` on first use and is not committed.
+Keep `scans/` outside the repo: it is about 300 MB of PDFs.
+
+Two of the 48 have no usable Wayback capture (Economics_1, English_7) and three
+more yield no paragraph that passes the filters, so the result is 44 essays.
+
 ## How the paragraphs were extracted
 
 The IBO PDFs are page images. `pdftotext` returns the running header and nothing

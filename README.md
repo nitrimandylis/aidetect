@@ -166,7 +166,9 @@ together and takes the worse verdict per sentence.
 | `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package |
 | `src/aidetect/thresholds/` | the thresholds shipped with the package; a threshold you fit yourself wins over these |
 | `corpora/` | labelled calibration sets: `human`/`ai` (humanities) and `human-tech`/`ai-tech` (maths, CS, science), plus `peer` for genre context. Repo-only, deliberately not shipped in the package, and **not covered by this repo's MIT licence** — see `corpora/README.md` |
-| `tools/ocr.swift` | macOS Vision OCR for one page image; prints text plus line geometry as TSV |
+| `tools/fetch_exemplars.sh` | downloads the 48 IBO exemplars from the Wayback Machine |
+| `tools/ocr.swift` | macOS Vision OCR for one page image; prints text plus line geometry as TSV. Compiled on demand by `run_ocr.sh`, never committed |
+| `tools/run_ocr.sh`, `tools/ocr_all.sh` | render a scan to 200 dpi pages and OCR it, one essay or a whole folder |
 | `tools/build_corpus.py` | turns scanned Extended Essays into corpus samples: paragraphs rebuilt from line geometry, footnote superscripts stripped, three paragraphs picked per essay |
 | `tools/ocr_bias.py` | measures what OCR does to a score, on the same prose read both ways |
 | `tests/` | count rules, Binoculars math, segment windows, corpus stripping and calibration grouping, all self-checking, no model download |
