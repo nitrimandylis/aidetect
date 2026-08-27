@@ -150,6 +150,41 @@ def is_list_item(text):
     return LIST_MARKERS.match(stripped) is not None
 
 
+# What a calibration sample must look like, for BOTH classes.
+#
+# This exists because the two halves were built to different standards. The
+# human selector in tools/build_corpus.py has always required a sensible length,
+# a capitalised start and a full stop at the end. The generator had only a
+# marker-phrase check, so each generation run surfaced a new asymmetry one at a
+# time: reasoning traces, then one-word answers, then paragraphs cut off
+# mid-clause. Every one of those is a difference between the classes that has
+# nothing to do with authorship, and a threshold fitted on any of them measures
+# the wrong thing.
+#
+# One function, both classes, checked before a sample is ever written.
+SAMPLE_MIN_WORDS = 60
+SAMPLE_MAX_WORDS = 260
+
+
+def sample_problem(text):
+    """Why this text cannot be a calibration sample, or None if it is fine."""
+    text = text.strip()
+    words = len(text.split())
+    if words < SAMPLE_MIN_WORDS:
+        return f"only {words} words"
+    if words > SAMPLE_MAX_WORDS:
+        return f"{words} words, too long"
+    if not re.match(r'^["\u201cA-Z]', text):
+        return "starts mid-sentence"
+    if not re.search(r'[.!?]["\u201d\')\]]?$', text):
+        return "ends mid-sentence"
+    if is_list_item(text):
+        return "is a list item or table row"
+    if "**" in text or text.startswith("#"):
+        return "contains markdown"
+    return None
+
+
 def is_prose(text, min_words=MIN_WORDS):
     """True if this paragraph is finished prose, not scaffolding.
 

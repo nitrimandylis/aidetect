@@ -512,10 +512,12 @@ def generate_one(entry, model, models_state, api_key, args, models=()):
         else:
             if text and not looks_like_prose(text):
                 text = ""          # a reasoning trace or a preamble leaked in
-            if text and len(text.split()) < MIN_SAMPLE_WORDS:
-                print(f"      {model} returned {len(text.split())} words, "
-                      f"under the {MIN_SAMPLE_WORDS}-word floor")
-                text = ""
+            if text:
+                from .text import sample_problem      # torch-free
+                problem = sample_problem(text)
+                if problem:
+                    print(f"      {model}: {problem}")
+                    text = ""
             if not text:
                 # Answered, but with nothing usable: a refusal, a planning
                 # trace, or a reasoning model that put everything in
