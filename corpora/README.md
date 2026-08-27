@@ -4,9 +4,9 @@
 
 | folder | what | n |
 |---|---|---|
-| `human/` | body paragraphs from pre-2020 IB Extended Essays, humanities and social sciences | 3 per essay |
-| `human-tech/` | the same, from maths, sciences, ITGS and computer science | 3 per essay |
-| `ai/`, `ai-tech/` | one clean-room LLM paragraph per human paragraph, on the same topic and from the same position in the essay | matched 1:1 |
+| `human/` | body paragraphs from pre-2020 IB Extended Essays, humanities and social sciences | 93, from 31 essays |
+| `human-tech/` | the same, from maths, sciences, ITGS and computer science | 51, from 17 essays |
+| `ai/`, `ai-tech/` | one clean-room LLM paragraph per human paragraph, on the same topic and from the same position in the essay | 93 and 51, matched 1:1 |
 
 Every folder has a `manifest.json`. Human entries record `source_url`,
 `date_evidence`, `extraction`, `source_essay`, `position`, and a `sha256` of the
@@ -50,7 +50,10 @@ python3 tools/build_corpus.py --tsv-dir scans/tsv --out-dir corpora/human-tech \
 Keep `scans/` outside the repo: it is about 300 MB of PDFs.
 
 Two of the 48 have no usable Wayback capture (Economics_1, English_7) and three
-more yield no paragraph that passes the filters, so the result is 44 essays.
+more yield no paragraph that passes the filters, so the collection route gives
+44 essays. Four more come from outside the collection, one economics and three
+computer science, each recorded in a folder's `sources-extra.json` with its own
+date evidence. That is 48 essays in all: 31 humanities and 17 technical.
 
 ## How the paragraphs were extracted
 

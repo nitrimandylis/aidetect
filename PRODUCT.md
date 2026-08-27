@@ -4,8 +4,9 @@ Local, offline AI-writing checks and IB word counts for my own drafts (EE, IA,
 etc). Tells me whether my prose reads as AI-generated *before* a teacher runs
 Turnitin, and whether the draft is over its word limit before I hand it in.
 
-Published to PyPI as `aidetect` (0.2.0, 2026-08-20) so it installs rather than
-being cloned. Source is at 0.3.0, not yet released. Releases go out from a GitHub release via trusted publishing —
+Published to PyPI as `aidetect` (0.3.0, 2026-08-27) so it installs rather than
+being cloned. The source carries unreleased work on top of that tag, including
+the rebuilt corpora and the thresholds refitted on them. Releases go out from a GitHub release via trusted publishing:
 `.github/workflows/publish.yml`, no token anywhere. To ship a version: bump
 `version` in pyproject.toml, then draft a release tagged `v<version>`.
 
@@ -33,12 +34,12 @@ that need no model stay instant.
   that paragraph mode skips.
 - `aidetect check` — runs the desklib segments and Binoculars over one draft and
   takes the **worst opinion per sentence**. Detectors disagreeing is the signal,
-  so nothing is averaged. No ensemble weights: 24 calibration samples cannot
+  so nothing is averaged. No ensemble weights: 31 calibration essays cannot
   support fitting any.
 - `aidetect bino` — training-free third scorer (base + instruct LM pair,
   perplexity ÷ cross-perplexity). Shelved with the Qwen pairs (62–67% on the
   labelled set, near chance) but **revived by Gemma 4**: the E2B pair separates
-  the same set at 92%. Gemma 4 is a multimodal checkpoint, so `--mlx` loads it
+  the set at 91.9%, held out an essay at a time. Gemma 4 is a multimodal checkpoint, so `--mlx` loads it
   4-bit via mlx-vlm and runs it text-only, fitting an 18GB Mac in ~6GB. desklib
   stays primary; Binoculars is a usable second opinion rather than a dead end.
 - `aidetect extract` — writes the paragraphs `count` counted into a `.txt`
@@ -55,9 +56,12 @@ that need no model stay instant.
   hosted models through NVIDIA NIM with no system prompt and no style guidance.
   Prompts carry the essay position of the human paragraph they match, which is
   structural rather than stylistic. `--workers` runs several completions at once
-  and `--timeout` sets how long one may take. The only subcommand that uses the
-  network at run time, and the only one needing a key (`NVIDIA_API_KEY`, read
-  from the environment, never stored).
+  and `--timeout` sets how long one may take. Every sample is validated by
+  `sample_problem()` before it is written, on the same rules the human selector
+  applies, and the model pool is swept up to three times before a sample is
+  given up on. The only subcommand that uses the network at run time, and the
+  only one needing a key (`NVIDIA_API_KEY`, read from the environment, never
+  stored).
 - `tools/` — repo-only, not shipped. `build_corpus.py` turns scanned Extended
   Essays into corpus samples through macOS Vision OCR, and `ocr_bias.py`
   measures what that transcription does to a score.
@@ -81,10 +85,13 @@ that need no model stay instant.
   exists and why the corpora are never hand-written. The story, with the
   numbers, is in `corpora/ai-tech/README.md`.
 - **The boundary is per genre, not just per model pair.** Human technical prose
-  means 0.83 on Binoculars where humanities prose means 0.90, so the default
-  threshold sits at the mean of genuine human maths and CS writing. `--tag tech`
-  moves it to 0.75. Both calibrations separate their own set at 92%: genre
-  shifts the level, it does not destroy discrimination.
+  means 0.89 on Binoculars where humanities prose means 0.91, and the technical
+  AI class also scores higher (0.71 against 0.66), so `--tag tech` sits at 0.802
+  where the default sits at 0.784. Fitted on twelve paragraphs a side the genre
+  gap looked like 0.07 and the tech threshold sat *below* the default; on the
+  full corpora it is 0.026 and sits slightly above. Keep the tag, since it
+  cross-validates better (95.1% against 91.9%), but it is a small correction
+  rather than the large shift the first fit implied.
 - **One walker, two filters.** `walk()` in `text.py` applies the structure
   rules once, and `count`, `extract` and `score` all read the document through
   it. Each job then layers its own filter: `count` strips in-text citations,
@@ -111,9 +118,11 @@ that need no model stay instant.
 - The human corpora are transcribed from scans, and OCR shifts a Binoculars
   score by about -0.007 against the same prose read from a text layer, roughly
   3.4% of the gap between the class means. Small, but toward leniency.
-- No computer science essay is in either human corpus. The three that were came
-  from outside the IBO collection and did not survive the rebuild, so a CS IA is
-  judged against ITGS and maths as the nearest certified-human genre.
+- The three computer science essays in `human-tech` come from outside the IBO
+  collection: two 2009 subject-report exemplars and one 2013 essay, each dated
+  from its own PDF metadata rather than from the collection's blanket 2008
+  copyright. They are the only certified-human CS prose here, and nine
+  paragraphs is thin evidence for judging a CS IA.
 - The desklib amber band is empty in both genres. The human 90th percentile is
   0.8415 over 107 humanities windows and 0.7448 over 65 technical ones, both
   above desklib's own 0.5 boundary, so desklib flags well over a tenth of

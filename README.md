@@ -166,7 +166,7 @@ together and takes the worse verdict per sentence.
 | file | job |
 |---|---|
 | `src/aidetect/cli.py` | the `aidetect` entry point — dispatches subcommands, importing each lazily so `count` never loads torch |
-| `src/aidetect/text.py` | shared, torch-free: `walk()` reads a `.docx`'s structure once, `is_prose()` is the detector's separate style filter |
+| `src/aidetect/text.py` | shared, torch-free: `walk()` reads a `.docx`'s structure once, `is_prose()` is the detector's separate style filter, `sample_problem()` vets a generated calibration sample before it is saved |
 | `src/aidetect/count.py` | the IB word count — sections, rollup, citation stripping, budget |
 | `src/aidetect/detect.py` | loads the desklib model, scores each paragraph, prints the bars and flags |
 | `src/aidetect/segments.py` | torch-free window arithmetic for `--segments` and `check`: sentence split, overlapping windows, worst-window scores, red/amber/clean |
@@ -197,12 +197,15 @@ is Falcon-7B ×2 (~28GB) — too big for an 18GB Mac, so the fallback was a smal
 same-family pair (Qwen2.5-0.5B or 1.5B) that fits.
 
 `aidetect calibrate` scores a labelled set and finds the best separating
-threshold. Mine is 132 paragraphs from 44 real pre-2020 IB Extended Essays,
-three per essay, against one LLM-written paragraph each on the same topic and
-from the same position in the essay.
+threshold. Mine is 144 paragraphs from 48 real pre-2020 IB Extended Essays,
+three per essay (93 humanities from 31 essays, 51 technical from 17), against
+one LLM-written paragraph each on the same topic and from the same position in
+the essay.
 
-The pair comparison below was measured on the earlier 12-vs-12 set, and the
-shipped Binoculars thresholds still come from that fit:
+The shipped Gemma thresholds are fitted on all of that. The pair comparison
+below is the older 12-vs-12 measurement; the Qwen pairs were never refitted on
+the full corpus, because a pair sitting at chance does not improve with more
+data:
 
 | pair | best separation | chance |
 |---|---|---|
@@ -213,8 +216,8 @@ shipped Binoculars thresholds still come from that fit:
 The Qwen pairs sit near a coin flip: their human and AI score clusters almost
 completely overlap, because the perplexity gap Binoculars exploits is sharp in
 larger models and mush in sub-2B ones. That was the original negative result.
-Swapping in a **Gemma 4** pair opens a clean gap (human mean 0.90 vs AI 0.69)
-and separates the set at 92%. Gemma 4 ships as a multimodal checkpoint, so
+Swapping in a **Gemma 4** pair opens a clean gap (human mean 0.91 against AI
+0.66) and separates the set at 91.9% leave-one-essay-out. Gemma 4 ships as a multimodal checkpoint, so
 `--mlx` quantizes it to 4-bit and runs it text-only through
 [mlx-vlm](https://github.com/Blaizzy/mlx-vlm), fitting the 18GB Mac in ~6GB:
 
@@ -263,13 +266,24 @@ free and rate limited rather than credit based, "dependent on model, use-case
 and the amount of current overall traffic using the same access". Measured, two
 models can return 429 while four others answer 200 in the same second, so a 429
 switches model rather than sleeping, and only a 429 from every model is worth
-waiting out. a reasoning trace
-instead of a paragraph is one bad roll at temperature 1.0. Counting either over
-a model's whole run guarantees that any model which slips occasionally is
-retired somewhere in a long corpus, which silently collapses the class onto the
-two or three models that never slip. The Gemma
+waiting out. Commentary, or a reasoning trace instead of a paragraph, is one bad
+roll at temperature 1.0. Counting either over a model's whole run guarantees
+that any model which slips occasionally is retired somewhere in a long corpus,
+which silently collapses the class onto the two or three models that never slip.
+Running out of models is not final either: the pool is swept up to three times
+for one sample before it is abandoned, because a lost sample leaves the AI class
+one paragraph short of the human one it was matched to. The Gemma
 family is never sampled: it is the detector's own pair, and scoring Gemma output
 with a Gemma observer/performer would flatter the detector.
+
+Every generated sample is checked before it is written. `sample_problem()` in
+`text.py` rejects anything under 60 words or over 260, anything starting or
+ending mid-sentence, list items and markdown. Each rule was added after a run
+produced a difference between the two classes that had nothing to do with
+authorship: a reasoning trace, a one-word answer, a paragraph cut off
+mid-clause. `--append` merges new samples into the manifest already in the
+output folder, so a corpus that has grown by three essays costs three calls
+rather than a hundred.
 
 This exists because of a real failure. An earlier AI set was written by an
 assistant carrying house style rules (write tightly, no em dashes, active voice)
@@ -421,17 +435,23 @@ The gap between the two verified human classes measures it:
 
 | set | Binoculars mean |
 |---|---|
-| `human` (2008 humanities EEs, verified pre-2020) | **0.90** |
-| `human-tech` (2008–2013 maths/science/ITGS EEs, verified) | **0.83** |
-| `ai` (LLM-written, matched topics) | **0.69** |
+| `human` (humanities EEs, verified pre-2020) | **0.91** |
+| `human-tech` (maths, science, ITGS and CS EEs, verified) | **0.89** |
+| `ai` (LLM-written, matched to `human`) | **0.66** |
+| `ai-tech` (LLM-written, matched to `human-tech`) | **0.71** |
 
-About **0.07** of the apparent signal on a technical draft is genre, not
-authorship. Score technical work with `--tag tech`, which encodes exactly that
-shift, rather than reading the humanities threshold and worrying.
+About **0.03** of the apparent signal on a technical draft is genre rather than
+authorship. The first fit, on twelve paragraphs a side, put that at 0.07, and
+the gap has shrunk every time the corpora grew: the technical AI class scores
+higher too, closing it from the other end. Treat the genre effect as small and
+loosely pinned down. Score technical work with `--tag tech` anyway, because that
+threshold is fitted on verified technical essays and holds up better under
+cross-validation (95.1% against 91.9%).
 
-Neither corpus currently contains a computer science essay. The three that used
-to sit in `human-tech` came from sources outside the IBO collection and did not
-survive the rebuild, so ITGS is the nearest certified-human genre for a CS IA.
+`human-tech` holds three computer science essays again: two IBO subject-report
+exemplars from 2009 and one 2013 essay, each with its own dated provenance in
+`sources-extra.json`. They came back in the archive restore after the first
+rebuild dropped them.
 
 **Stack:** python · pytorch · transformers · mlx-vlm · desklib DeBERTa
 

@@ -5,9 +5,9 @@ description: Drive the aidetect CLI — counts a draft the way the IB counts it 
 
 # aidetect
 
-One command, seven subcommands. Three are instant; three load a model and
-download gigabytes on their first run; one calls a paid API over the network.
-Knowing which is which is most of what this skill is for.
+One command, seven subcommands. Two are instant; four load a model and download
+gigabytes on their first run; one calls a hosted API over the network. Knowing
+which is which is most of what this skill is for.
 
 ## Setup
 
@@ -31,8 +31,8 @@ PYTHONPATH=src python -m aidetect.cli <subcommand> ...
 | `aidetect score <file> --segments` | as `score` | overlapping 7-sentence windows; reports *% of prose in flagged segments*, the shape Turnitin reports |
 | `aidetect bino <file> --mlx --pair gemma` | **~6 GB download + a local quantization on first run** | Binoculars, **lower** = more AI-ish |
 | `aidetect check <file>` | loads **both** models, so both downloads | the combined verdict, worst opinion per sentence. Prefer this when the user wants one answer |
-| `aidetect calibrate --human-dir D --ai-dir D` | as `bino`, times the sample count | refits a threshold; needs data that does not ship |
-| `aidetect generate --topics M --out-dir D` | **network, and spends API credits** | builds an AI calibration corpus through NVIDIA NIM. Needs `NVIDIA_API_KEY` set by Nick. Never run it unasked |
+| `aidetect calibrate --human-dir D --ai-dir D` | as `bino`, plus ~0.55s per sample and ~0.87s per human window | refits the Binoculars threshold *and* the desklib amber band in one run. Measured on the M3 Pro: ~3.5 min for `corpora/human`, ~2 min for `corpora/human-tech`. Needs data that does not ship |
+| `aidetect generate --topics M --out-dir D` | **network; NIM's free tier, rate limited rather than metered** | builds an AI calibration corpus through NVIDIA NIM. Needs `NVIDIA_API_KEY` set by Nick. Pass `--append` when only new samples are wanted. Never run it unasked |
 
 **Default to `count`.** It answers the question the user usually has, costs
 nothing, and needs no network. Only reach for `score` or `bino` when the user
@@ -71,13 +71,20 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
   separates the calibration set at 62%, `big` at 67%. Only `--mlx --pair gemma`
   (92%) is worth reporting. On this Mac always pass both flags.
 - **Score a maths, CS or science draft with `--tag tech`.** Human *technical*
-  prose scores lower on Binoculars than humanities prose for everyone (mean 0.83
-  against 0.90), and the default threshold of 0.826 sits at the technical human
-  mean, so a maths or CS essay flags roughly half its paragraphs no matter who
-  wrote it. `--tag tech` uses the 0.753 threshold fitted on verified technical
-  essays. It moved Nick's maths IA from 28% to 13% and his CS IA from 51% to
-  32%. Without the tag those numbers are noise, so report them with the caveat
-  or not at all. `--tag` works on `check`, `bino` and `score --segments`.
+  prose scores a little lower on Binoculars than humanities prose (mean 0.89
+  against 0.91), and the tech threshold is fitted on verified technical essays,
+  where the default is not. It also cross-validates better: 95.1% held out an
+  essay at a time, against 91.9% for the default. `--tag` works on `check`,
+  `bino` and `score --segments`.
+
+  The reason has changed, so do not repeat the old one. On twelve paragraphs a
+  side the genre gap read 0.07 and the tech threshold came out *below* the
+  default, which made the default look like it sat at the technical human mean
+  and flagged half of any maths or CS draft. Refitted on 51 technical and 93
+  humanities paragraphs the gap is 0.026 and the tech threshold (0.802) sits
+  slightly *above* the default (0.784). The old flag-rate numbers for Nick's own
+  drafts (maths IA 28% to 13%, CS IA 51% to 32%) were measured with the old
+  thresholds and have not been re-measured. Do not quote them as current.
 - **`--pair gemma+` (E4B) is not worth the download.** It was calibrated and tied
   E2B at 92% while being far larger, and the package ships no E4B threshold, so
   without a locally fitted one it falls back to the Falcon placeholder of 0.9 and
