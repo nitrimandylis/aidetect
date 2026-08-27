@@ -95,6 +95,12 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
 - **A draft with no headings is counted whole**, cover page included, and
   `count` says so in a note under the table. Repeat that note instead of giving
   the total on its own, because nothing was excluded from it.
+- **List items are not scored, in either mode.** Bullets, numbered items,
+  labelled criteria (`SC12`, `FR3`) and tab-separated table rows are filtered
+  out before the detector sees them. So a spec-heavy IA reports a lower flagged
+  percentage than it used to, and that is the fix, not a regression: those runs
+  were the detector reacting to formatting. `count` still counts them, because
+  the examiner does. If a user asks why a number dropped, this is usually why.
 - **Paragraph mode skips paragraphs under 25 words**, so a short or bullet-heavy
   draft can legitimately report "no paragraphs found". That is not a failure.
   `count` has no such floor, and neither do `score --segments` or `check`: those

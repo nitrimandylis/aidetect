@@ -144,7 +144,19 @@ different question asked of the same paragraphs. A 6-word sentence is a word the
 examiner counts and noise to a paragraph scorer, which is why `count` and
 `is_prose` are separate filters rather than one.
 
-The two scoring paths differ on purpose. **Paragraph mode** applies the 25-word
+The two scoring paths differ on purpose. List items never reach either detector. Bullets, `1.`/`1)` numbering, labelled
+criteria like `SC12` or `FR3`, and tab-separated table rows are filtered by
+`is_list_item()` in `text.py`, which `is_prose()` calls. This matters most in
+segment mode, which drops the word floor on purpose: without the filter a CS
+IA's success-criteria table and its numbered design breakdown reached the
+detector as prose and drove 16% of that draft into the flagged bucket, which
+measures formatting rather than writing. Single-letter items (`a)`) and roman
+numerals are deliberately *not* filtered, because they cannot be told apart
+from an initial opening a sentence, and dropping a paragraph that begins
+"T. S. Eliot wrote..." is the worse error. `count` is unaffected: the examiner
+counts those words, so the IB word count still does too.
+
+**Paragraph mode** applies the 25-word
 floor, because a fragment scores as noise on its own. **Segment mode** drops it
 and slides overlapping windows instead, so those same short connective sentences
 get scored inside a window with their neighbours — and formulaic linking prose is
@@ -165,6 +177,7 @@ together and takes the worse verdict per sentence.
 | `src/aidetect/generate.py` | generates the AI half of a calibration set through NVIDIA NIM, with no system prompt and no style guidance, so the adversary stays fair |
 | `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package |
 | `src/aidetect/thresholds/` | the thresholds shipped with the package; a threshold you fit yourself wins over these |
+| `pyproject.toml` sdist excludes | `corpora`, `tests`, `tools` — `tests/fixtures/` holds the same essay excerpts as `corpora/`, so shipping the tests would redistribute what `corpora/` is withheld to protect |
 | `corpora/` | labelled calibration sets: `human`/`ai` (humanities) and `human-tech`/`ai-tech` (maths, CS, science), plus `peer` for genre context. Repo-only, deliberately not shipped in the package, and **not covered by this repo's MIT licence** — see `corpora/README.md` |
 | `tools/fetch_exemplars.sh` | downloads the 48 IBO exemplars from the Wayback Machine |
 | `tools/ocr.swift` | macOS Vision OCR for one page image; prints text plus line geometry as TSV. Compiled on demand by `run_ocr.sh`, never committed |
@@ -244,8 +257,13 @@ ones block everything. Raise it too far and NIM answers 429. `--timeout` sets ho
 long one completion may take; the default of 180s is deliberately generous
 because a tighter limit retires working models as though they were dead.
 
-Transient failures are counted **per sample, not per model**. A 429 says the
-account is over its rate limit and nothing about the model; a reasoning trace
+Transient failures are counted **per sample, not per model**. A 429 says that
+*model* is busy this minute and nothing about your account: build.nvidia.com is
+free and rate limited rather than credit based, "dependent on model, use-case
+and the amount of current overall traffic using the same access". Measured, two
+models can return 429 while four others answer 200 in the same second, so a 429
+switches model rather than sleeping, and only a 429 from every model is worth
+waiting out. a reasoning trace
 instead of a paragraph is one bad roll at temperature 1.0. Counting either over
 a model's whole run guarantees that any model which slips occasionally is
 retired somewhere in a long corpus, which silently collapses the class onto the
@@ -308,6 +326,25 @@ clone the repo to reproduce the numbers, or point `--human-dir`/`--ai-dir` at
 your own. Your fitted threshold lands in `~/.config/aidetect` and takes
 precedence over the shipped one, so it survives an upgrade.
 
+### The desklib amber band is per genre too
+
+`calibrate` fits it as the 90th percentile of human window scores, clamped so it
+never crosses desklib's own 0.5 red line:
+
+| band | windows | essays | human p90 | amber edge |
+|---|---|---|---|---|
+| default (humanities) | 95 | 30 | 0.6013 | 0.5, i.e. **empty** |
+| `--tag tech` | 42 | 14 | 0.4215 | **0.4215** |
+
+The humanities band is empty and will stay empty. Nine in ten human windows are
+supposed to fall below the edge, but the 90th percentile of provably human 2008
+Extended Essay prose sits *above* desklib's own boundary, so there is no room
+below red for a band to live in. That is a limit of the model, not of the
+corpus: more human data moves the number down but not past 0.5. Fitted on a
+dozen windows it read 0.7365, so the old figure was inflated rather than merely
+imprecise. Technical prose scores lower across the board, which is why the tech
+band has somewhere to sit.
+
 ### Three paragraphs per essay, and why they are grouped
 
 The human corpora are built from scans. The IBO *50 Excellent Extended Essays*
@@ -367,8 +404,11 @@ supports a direction, not a precise effect size.
 
 ## 🧪 The peer set: genre context, not a human class
 
-The 12 human samples are Extended Essays: English, History, Biology, Physics,
-Philosophy. A CS IA is a different animal, all database schemas, GUI components and
+The human samples are Extended Essays across ten humanities and social science
+subjects, with maths, sciences and ITGS in `human-tech`. Neither contains a
+computer science essay: the three that used to sit in `human-tech` came from
+sources outside the IBO collection and did not survive the rebuild, so ITGS is
+the closest certified-human genre. A CS IA is a different animal, all database schemas, GUI components and
 method-by-method justification, and technical prose is inherently more
 predictable token-by-token, which drags perplexity-ratio scores down no matter
 who typed it. So a CS IA scoring below the EE human mean means less than it

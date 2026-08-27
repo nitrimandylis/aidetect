@@ -111,6 +111,9 @@ that need no model stay instant.
 - The human corpora are transcribed from scans, and OCR shifts a Binoculars
   score by about -0.007 against the same prose read from a text layer, roughly
   3.4% of the gap between the class means. Small, but toward leniency.
+- No computer science essay is in either human corpus. The three that were came
+  from outside the IBO collection and did not survive the rebuild, so a CS IA is
+  judged against ITGS and maths as the nearest certified-human genre.
 - The desklib amber band is empty for humanities prose and will stay that way.
   With 95 windows behind it the human 90th percentile is 0.6013, above desklib's
   own 0.5 boundary, so desklib flags more than a tenth of provably human 2008
