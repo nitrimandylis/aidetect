@@ -33,10 +33,12 @@ temperature, so a calibration fitted on this set can be audited or reproduced.
 
 import argparse
 import collections
+import concurrent.futures
 import json
 import os
 import random
 import re
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -277,6 +279,141 @@ def clean(text):
     return " ".join(line.strip() for line in lines).strip().strip('"')
 
 
+class ModelPool:
+    """Which models are still worth calling, shared by every worker thread.
+
+    Half of NIM's catalog 404s per account and a couple of models simply never
+    answer, so a model that fails is dropped once and every worker sees that
+    immediately rather than each rediscovering it. All the shared counters live
+    behind one lock: they are only touched between HTTP calls, so contention is
+    irrelevant and one lock is easier to reason about than three.
+    """
+
+    def __init__(self, pool):
+        self.pool = pool
+        self.lock = threading.Lock()
+        self.unavailable = set()
+        self.rate_limited = collections.Counter()
+        self.vendor_counts = collections.Counter()
+
+    def replacement_for(self, model):
+        """Drop `model` and return another one to try, or None if none are left."""
+        with self.lock:
+            self.unavailable.add(model)
+            return substitute(self.pool, self.unavailable, self.vendor_counts)
+
+    def still_usable(self, model):
+        with self.lock:
+            if model not in self.unavailable:
+                return model
+            return substitute(self.pool, self.unavailable, self.vendor_counts)
+
+    def note_retry(self, model):
+        """Count one retry for this model and return the new total."""
+        with self.lock:
+            self.rate_limited[model] += 1
+            return self.rate_limited[model]
+
+    def note_use(self, model):
+        with self.lock:
+            self.vendor_counts[vendor_of(model)] += 1
+
+
+def sample_id_for(human_id, prefix):
+    """th07a -> ta07a: keep the essay number AND the paragraph letter.
+
+    The letter is what lets calibrate group an essay's three AI samples with
+    its three human ones. Older single-paragraph ids (h01) end in a digit and
+    simply have no letter.
+    """
+    number = ""
+    for character in human_id:
+        if character.isdigit():
+            number += character
+    letter = ""
+    if human_id[-1].isalpha() and number:
+        letter = human_id[-1]
+    return f"{prefix}{number}{letter}"
+
+
+def generate_one(entry, model, models_state, api_key, args):
+    """Write one sample and return its manifest row, or None if nothing worked.
+
+    Returns rather than exiting, because this runs in a worker thread where a
+    SystemExit would be swallowed and leave the corpus quietly short.
+    """
+    out_id = sample_id_for(entry["id"], args.prefix)
+    position = entry.get("position")
+    prompt = build_prompt(entry["topic"], args.words, position)
+
+    model = models_state.still_usable(model)
+    text = ""
+    while not text:
+        if model is None:
+            print(f"      {out_id}: every candidate model failed, no sample written")
+            return None
+        print(f"{out_id}  {model}  {entry['topic'][:50]}...")
+        try:
+            text = clean(call_nim(prompt, model, api_key, args.timeout))
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode("utf-8", "replace")[:200]
+            if error.code in (401, 403) and "account" not in detail:
+                raise SystemExit(f"NIM rejected the API key ({error.code}): {detail}")
+            if error.code == 429 and models_state.note_retry(model) <= RATE_LIMIT_RETRIES:
+                # transient: the model works, we are just going too fast.
+                # Dropping it here would silently shrink the corpus's variety.
+                wait = RATE_LIMIT_BACKOFF * models_state.rate_limited[model]
+                print(f"      429 for {model}, waiting {wait}s and retrying")
+                time.sleep(wait)
+                continue
+            print(f"      {error.code} for {model}, dropping it: {detail[:90]}")
+            model = models_state.replacement_for(model)
+        except TimeoutError:
+            # a cold or heavily loaded model can sit past the timeout; give it
+            # one more go, then move on rather than stalling the whole corpus
+            if models_state.note_retry(model) <= 1:
+                print(f"      {model} timed out, retrying once")
+                continue
+            print(f"      {model} timed out again, dropping it")
+            model = models_state.replacement_for(model)
+        except urllib.error.URLError as error:
+            if isinstance(error.reason, TimeoutError):
+                print(f"      {model} timed out, dropping it")
+                model = models_state.replacement_for(model)
+            else:
+                raise SystemExit(f"could not reach NIM: {error.reason}")
+        else:
+            if text and not looks_like_prose(text):
+                # a reasoning trace or a preamble leaked into content
+                print(f"      {model} answered with commentary, dropping it")
+                text = ""
+            if not text:
+                # answered, but with nothing usable (a refusal, or a reasoning
+                # model that put everything in reasoning_content)
+                print(f"      {model} returned no prose, dropping it")
+                model = models_state.replacement_for(model)
+
+    models_state.note_use(model)
+    text = trim_to_words(text, args.words)
+    path = os.path.join(args.out_dir, f"{out_id}.txt")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text + "\n")
+    return {
+        "id": out_id,
+        "matches": entry["id"],
+        "subject": entry.get("subject"),
+        "topic": entry["topic"],
+        "position": position,
+        "generated_by": model,
+        "vendor": vendor_of(model),
+        "temperature": TEMPERATURE,
+        "prompt_template": POSITIONED_TEMPLATE if position else PROMPT_TEMPLATE,
+        "words_requested": args.words,
+        "words_kept": len(text.split()),
+        "seed": args.seed,
+    }
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="aidetect generate",
@@ -293,6 +430,10 @@ def main(argv=None):
                     help="seed the model sampling so a corpus can be regenerated")
     ap.add_argument("--words", type=int, default=110,
                     help="target words per paragraph (default %(default)s)")
+    ap.add_argument("--workers", type=int, default=1,
+                    help="how many completions to request at once (default %(default)s, "
+                         "i.e. sequential). Raise it when the model pool mixes fast and "
+                         "slow models; too high and NIM starts answering 429.")
     ap.add_argument("--timeout", type=int, default=180,
                     help="seconds to wait for one completion (default %(default)s). "
                          "Measured: a large hosted model can legitimately take ~120s, "
@@ -332,105 +473,29 @@ def main(argv=None):
 
     os.makedirs(args.out_dir, exist_ok=True)
 
-    unavailable = set()                        # models this account cannot call
-    rate_limited = collections.Counter()       # per-model 429 retries so far
-    vendor_counts = collections.Counter()      # vendors used so far, to keep the spread
+    models_state = ModelPool(pool)
+
+    # Threads, not processes: every worker spends its time waiting on an HTTP
+    # response. It matters here because the usable models differ in speed by
+    # more than 10x (one large model legitimately takes ~120s while others
+    # answer in ~10s), so in a sequential run the slow ones block everything.
     written = []
-    for index, entry in enumerate(topics):
-        human_id = entry["id"]
-        # th01 -> ta01: keep the number, swap the prefix, so the pairing is obvious
-        # th07a -> ta07a: keep the essay number AND the paragraph letter, so the
-        # pairing stays obvious and calibrate groups both halves by the same essay.
-        number = ""
-        for character in human_id:
-            if character.isdigit():
-                number += character
-        # older single-paragraph ids (h01) end in a digit and have no letter
-        letter = ""
-        if human_id[-1].isalpha() and number:
-            letter = human_id[-1]
-        out_id = f"{args.prefix}{number}{letter}"
-        model = models[index]
-        position = entry.get("position")
-        prompt = build_prompt(entry["topic"], args.words, position)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as workers:
+        jobs = {}
+        for index, entry in enumerate(topics):
+            job = workers.submit(generate_one, entry, models[index],
+                                 models_state, api_key, args)
+            jobs[job] = index
 
-        # The catalog lists what NIM serves, not what THIS account may call, so a
-        # model can still 404. Swap it for another vendor's and carry on: aborting
-        # here would leave a half-written corpus that looks complete.
-        while model in unavailable:
-            model = substitute(pool, unavailable, vendor_counts)
-            if model is None:
-                raise SystemExit("every candidate model failed; corpus left incomplete")
-        text = ""
-        while not text:
-            print(f"{out_id}  {model}  {entry['topic'][:50]}...")
-            try:
-                text = clean(call_nim(prompt, model, api_key, args.timeout))
-            except urllib.error.HTTPError as error:
-                detail = error.read().decode("utf-8", "replace")[:200]
-                if error.code in (401, 403) and "account" not in detail:
-                    raise SystemExit(f"NIM rejected the API key ({error.code}): {detail}")
-                if error.code == 429 and rate_limited[model] < RATE_LIMIT_RETRIES:
-                    # transient: the model works, we are just going too fast.
-                    # Dropping it here would silently shrink the corpus's variety.
-                    rate_limited[model] += 1
-                    wait = RATE_LIMIT_BACKOFF * rate_limited[model]
-                    print(f"      429 for {model}, waiting {wait}s and retrying")
-                    time.sleep(wait)
-                    continue
-                print(f"      {error.code} for {model}, dropping it: {detail[:90]}")
-                unavailable.add(model)
-                model = substitute(pool, unavailable, vendor_counts)
-            except TimeoutError:
-                # a cold or heavily loaded model can sit past the timeout; give it
-                # one more go, then move on rather than stalling the whole corpus
-                rate_limited[model] += 1
-                if rate_limited[model] <= 1:
-                    print(f"      {model} timed out, retrying once")
-                    continue
-                print(f"      {model} timed out again, dropping it")
-                unavailable.add(model)
-                model = substitute(pool, unavailable, vendor_counts)
-            except urllib.error.URLError as error:
-                if isinstance(error.reason, TimeoutError):
-                    print(f"      {model} timed out, dropping it")
-                    unavailable.add(model)
-                    model = substitute(pool, unavailable, vendor_counts)
-                else:
-                    raise SystemExit(f"could not reach NIM: {error.reason}")
-            else:
-                if text and not looks_like_prose(text):
-                    # a reasoning trace or a preamble leaked into content
-                    print(f"      {model} answered with commentary, dropping it")
-                    text = ""
-                if not text:
-                    # answered, but with nothing usable (a refusal, or a reasoning
-                    # model that put everything in reasoning_content)
-                    print(f"      {model} returned no prose, dropping it")
-                    unavailable.add(model)
-                    model = substitute(pool, unavailable, vendor_counts)
-            if model is None:
-                raise SystemExit("every candidate model failed; corpus left incomplete")
+        rows_by_index = {}
+        for job in concurrent.futures.as_completed(jobs):
+            row = job.result()
+            if row is not None:
+                rows_by_index[jobs[job]] = row
 
-        vendor_counts[vendor_of(model)] += 1
-        text = trim_to_words(text, args.words)
-        path = os.path.join(args.out_dir, f"{out_id}.txt")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(text + "\n")
-        written.append({
-            "id": out_id,
-            "matches": human_id,
-            "subject": entry.get("subject"),
-            "topic": entry["topic"],
-            "position": position,
-            "generated_by": model,
-            "vendor": vendor_of(model),
-            "temperature": TEMPERATURE,
-            "prompt_template": POSITIONED_TEMPLATE if position else PROMPT_TEMPLATE,
-            "words_requested": args.words,
-            "words_kept": len(text.split()),
-            "seed": args.seed,
-        })
+    # keep manifest order matching the topics file, not completion order
+    for index in sorted(rows_by_index):
+        written.append(rows_by_index[index])
 
     manifest_path = os.path.join(args.out_dir, "manifest.json")
     with open(manifest_path, "w", encoding="utf-8") as f:

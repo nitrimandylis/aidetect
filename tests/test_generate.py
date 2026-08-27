@@ -14,6 +14,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from aidetect.generate import (POPULAR_MODELS, POSITIONED_TEMPLATE,  # noqa: E402
+                               sample_id_for,
                                PROMPT_TEMPLATE, build_prompt, clean,
                                looks_like_prose, pick_models, trim_to_words,
                                vendor_of)
@@ -50,6 +51,16 @@ def test_position_is_structural_and_optional():
     assert "conclusion section" in with_position
     assert without == PROMPT_TEMPLATE.format(topic="Alhazen's billiard problem", words=110)
     assert "section" not in without
+
+
+def test_ai_id_mirrors_the_human_id_it_matches():
+    """calibrate groups both halves of the set by the digits in the id, so an
+    AI sample must keep the essay number and the paragraph letter of the human
+    paragraph it was generated against."""
+    assert sample_id_for("th07a", "ta") == "ta07a"
+    assert sample_id_for("h12c", "a") == "a12c"
+    # the pre-three-paragraph ids end in a digit and have no letter
+    assert sample_id_for("h01", "a") == "a01"
 
 
 def test_clean_strips_wrapper_but_not_prose():
