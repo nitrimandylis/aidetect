@@ -63,6 +63,17 @@ def test_ai_id_mirrors_the_human_id_it_matches():
     assert sample_id_for("h01", "a") == "a01"
 
 
+def test_a_truncated_answer_is_below_the_floor():
+    """A real run saved an "AI paragraph" that was the single word "Here", plus
+    five more of 7 to 32 words. The human class is 60-160 words, so short
+    samples make length the signal rather than authorship."""
+    from aidetect.generate import MIN_SAMPLE_WORDS
+    assert MIN_SAMPLE_WORDS == 60
+    assert len("Here".split()) < MIN_SAMPLE_WORDS
+    long_enough = " ".join(["word"] * 60)
+    assert len(long_enough.split()) >= MIN_SAMPLE_WORDS
+
+
 def test_clean_strips_wrapper_but_not_prose():
     raw = 'Here is the paragraph:\n\n"The law of reflection states that the angle is equal."\n'
     assert clean(raw) == "The law of reflection states that the angle is equal."

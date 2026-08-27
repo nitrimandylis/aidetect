@@ -139,6 +139,15 @@ BAD_RESPONSE_RETRIES = 3
 # imbalance the matched design exists to avoid.
 POOL_SWEEPS = 3
 
+# The shortest answer worth keeping. build_corpus.py takes human paragraphs of
+# 60-160 words, and `trim_to_words` already stops the AI class running long; this
+# is the other end of the same rule. Without it a truncated answer is saved as a
+# sample: one real run produced an "AI paragraph" consisting of the single word
+# "Here", and five more of 7 to 32 words. Perplexity over a handful of tokens is
+# noise, and a class whose members are far shorter than their human counterparts
+# teaches the threshold that length is the signal.
+MIN_SAMPLE_WORDS = 60
+
 
 def build_prompt(topic, words, position=None):
     """The prompt for one sample.
@@ -483,6 +492,10 @@ def generate_one(entry, model, models_state, api_key, args, models=()):
         else:
             if text and not looks_like_prose(text):
                 text = ""          # a reasoning trace or a preamble leaked in
+            if text and len(text.split()) < MIN_SAMPLE_WORDS:
+                print(f"      {model} returned {len(text.split())} words, "
+                      f"under the {MIN_SAMPLE_WORDS}-word floor")
+                text = ""
             if not text:
                 # Answered, but with nothing usable: a refusal, a planning
                 # trace, or a reasoning model that put everything in
