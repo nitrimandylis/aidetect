@@ -130,6 +130,15 @@ RATE_LIMIT_BACKOFF = 20   # seconds, multiplied by how many times we have waited
 # get dropped anyway. Rolling badly on one topic says nothing about the next.
 BAD_RESPONSE_RETRIES = 3
 
+# How many times to work through the whole model pool for one sample before
+# giving up on it. Without this a sample is abandoned the moment every model has
+# been tried once, and `tried` does not distinguish "this model will not write
+# this topic" from "this model was busy for a second" — a few 429s in a row are
+# enough to burn through the pool and lose the sample for good. Losing one
+# leaves the AI class short against its human counterpart, which is exactly the
+# imbalance the matched design exists to avoid.
+POOL_SWEEPS = 3
+
 
 def build_prompt(topic, words, position=None):
     """The prompt for one sample.
@@ -384,7 +393,7 @@ def sample_id_for(human_id, prefix):
     return f"{prefix}{number}{letter}"
 
 
-def generate_one(entry, model, models_state, api_key, args):
+def generate_one(entry, model, models_state, api_key, args, models=()):
     """Write one sample and return its manifest row, or None if nothing worked.
 
     Returns rather than exiting, because this runs in a worker thread where a
@@ -395,6 +404,7 @@ def generate_one(entry, model, models_state, api_key, args):
     prompt = build_prompt(entry["topic"], args.words, position)
 
     model = models_state.still_usable(model)
+    sweeps = 0            # how many times the whole pool has been worked through
     # Models that would not serve this particular sample, whether because they
     # kept answering with commentary or because they were busy. Note this means
     # a sample can end up on a different model than --seed assigned; the
@@ -406,7 +416,21 @@ def generate_one(entry, model, models_state, api_key, args):
     text = ""
     while not text:
         if model is None:
-            print(f"      {out_id}: every candidate model failed, no sample written")
+            # Pool exhausted. Most of the time that is a run of bad luck rather
+            # than six broken models, so let everything back in and sweep again.
+            sweeps += 1
+            if sweeps < POOL_SWEEPS:
+                print(f"      {out_id}: every model tried, sweeping again "
+                      f"({sweeps}/{POOL_SWEEPS - 1}) after {RATE_LIMIT_BACKOFF}s")
+                time.sleep(RATE_LIMIT_BACKOFF)
+                tried = []
+                model = models_state.still_usable(models[0] if models else None)
+                if model is None:
+                    print(f"      {out_id}: no model left at all, no sample written")
+                    return None
+                continue
+            print(f"      {out_id}: every model failed {POOL_SWEEPS} sweeps, "
+                  f"no sample written")
             return None
         print(f"{out_id}  {model}  {entry['topic'][:50]}...")
         try:
@@ -571,7 +595,7 @@ def main(argv=None):
         jobs = {}
         for index, entry in enumerate(topics):
             job = workers.submit(generate_one, entry, models[index],
-                                 models_state, api_key, args)
+                                 models_state, api_key, args, models)
             jobs[job] = index
 
         rows_by_index = {}
