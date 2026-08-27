@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aidetect"
-version = "0.3.0"
+version = "0.4.0"
 description = "Local, offline AI-writing detector and IB word counter for your own drafts"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -36,7 +36,7 @@ aidetect = "aidetect.cli:main"
 packages = ["src/aidetect"]
 
 [tool.hatch.build.targets.sdist]
-# corpora/ is short excerpts from 44 real students' Extended Essays plus LLM
+# corpora/ is short excerpts from 48 real students' Extended Essays plus LLM
 # imitations, and the *-clean.txt files are my own drafts. Repo-only.
 #
 # tests/ is excluded for the same reason, not for tidiness: tests/fixtures/
