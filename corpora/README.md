@@ -56,6 +56,42 @@ Three paragraphs per essay, one from each third of the body, because:
 - roughly 8% of a 4000-word essay is a defensible excerpt and more is not, so
   three is a ceiling rather than a starting point.
 
+## What OCR does to a score
+
+The human class is transcribed from scans and the AI class arrives as clean
+UTF-8 from an API. If OCR noise moved scores, the threshold would be partly
+detecting "was this text scanned", which generalises to nothing when the tool is
+pointed at a typed draft. So it was measured rather than assumed.
+
+`tools/ocr_bias.py` does the paired version: take a born-digital exemplar, read
+its text layer, render the same pages to images, OCR them, and match paragraph
+to paragraph. Any difference is the transcription route and nothing else.
+Comparing OCR'd essays against different born-digital essays would have
+confounded the route with the author.
+
+Measured on 17 paired paragraphs from the two born-digital exemplars, scored
+with the gemma-mlx pair:
+
+| | score |
+|---|---|
+| clean text layer, mean | 0.9111 |
+| OCR of the same pages, mean | 0.9040 |
+| **mean delta** | **-0.0071** |
+| median character error rate | 2.33% |
+
+OCR moves human prose **down**, that is very slightly toward the machine side,
+on 11 of 17 paragraphs. The shift is about 3.4% of the gap between the human and
+AI class means, so it is small, but the direction is the unhelpful one: a human
+class shifted down drags the fitted cutoff down with it, and a lower cutoff is a
+more lenient detector. A false negative is the one error this tool exists to
+prevent.
+
+Two caveats. Seventeen pairs from two essays supports a direction, not a precise
+effect size. And the match rate was low (17 of 65 clean paragraphs) because
+`pdftotext` and the geometry pipeline disagree about where paragraphs split;
+unmatched paragraphs were dropped rather than force-paired, which is the
+conservative choice.
+
 Paragraphs from one essay share an author and are **not** independent
 observations. `calibrate` groups them by essay and reports leave-one-essay-out
 accuracy for that reason. `n_essays` in each threshold file is the real sample
