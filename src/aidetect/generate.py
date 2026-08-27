@@ -112,8 +112,9 @@ POSITIONED_TEMPLATE = (
 
 TEMPERATURE = 1.0   # the model's own default register; low temp writes flatter prose
 
-RATE_LIMIT_RETRIES = 3    # a 429 means "slow down", not "this model is unusable"
-RATE_LIMIT_BACKOFF = 20   # seconds, multiplied by the attempt number
+# Only reached when EVERY model is rate limited at once; a 429 from one model
+# switches to another instead of waiting. See the 429 branch in generate_one.
+RATE_LIMIT_BACKOFF = 20   # seconds, multiplied by how many times we have waited
 
 # A model that answers with a reasoning trace instead of the paragraph has had
 # ONE bad roll, not a permanent fault: the nemotron models do it perhaps one
