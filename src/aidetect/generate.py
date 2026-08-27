@@ -8,16 +8,21 @@ pulls the two clusters together, lowers the fitted threshold, and makes the
 detector more lenient — a false negative is the one error this tool exists to
 prevent. It happened once already, which is why corpora/ai-tech was quarantined.
 
-So the generator calls a hosted model over NVIDIA NIM with NO system prompt and
-NO style guidance in the user prompt: only the topic and a word count. Prefer
-models from a different family than the detector's own pair, so the adversary is
-not drawn from the distribution the detector knows best. Pass --model more than
-once and it rotates across topics, which stops the class becoming one model's
-quirks.
+So the generator calls hosted models over NVIDIA NIM with NO system prompt and
+NO style guidance in the user prompt: only the topic and a word count.
+
+By default it samples popular models ACROSS VENDORS, one paragraph each, so the
+AI class is machine writing in general rather than one model's habits — different
+model, different tokenizer, different training mix. The Gemma family is left out
+on purpose: it is the detector's own pair, and scoring Gemma output with a Gemma
+observer/performer would flatter the detector.
 
     export NVIDIA_API_KEY=nvapi-...        # you set this, aidetect never writes it
     aidetect generate --topics corpora/human-tech/manifest.json \
-                      --out-dir corpora/ai-tech --prefix ta
+                      --out-dir corpora/ai-tech --prefix ta --seed 7
+
+Pass --seed to make the model assignment repeatable; pass --model (repeatable) to
+pin exact models instead of sampling.
 
 Get a key (and free credits) at https://build.nvidia.com. NIM is OpenAI-
 compatible, so this needs no SDK: urllib posts the JSON itself.
@@ -29,13 +34,46 @@ temperature, so a calibration fitted on this set can be audited or reproduced.
 import argparse
 import json
 import os
+import random
 import urllib.error
 import urllib.request
 
 NIM_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+NIM_CATALOG_URL = "https://integrate.api.nvidia.com/v1/models"
 
-# Different family from the detector's Gemma pair, on purpose.
-DEFAULT_MODELS = ["meta/llama-3.3-70b-instruct"]
+# Popular general-purpose chat models, most-wanted first. NIM's catalog endpoint
+# lists what is served but publishes no popularity figure, so this ranking is
+# hand-kept; it is INTERSECTED with the live catalog at run time, so an entry
+# that disappears is dropped instead of 404-ing mid-corpus.
+#
+# Deliberately excluded:
+#   - google/gemma*  the detector's own family. Generating with Gemma and then
+#     scoring with a Gemma observer/performer pair flatters the detector: its
+#     own family's output is unusually unsurprising to it.
+#   - code, embedding, vision, safety-guard, reward, translate and parse models,
+#     which either cannot hold a conversation or write nothing like essay prose.
+POPULAR_MODELS = [
+    "deepseek-ai/deepseek-v4-pro-0813",
+    "moonshotai/kimi-k3",
+    "openai/gpt-oss-120b",
+    "nvidia/nemotron-3-super-120b-a12b",
+    "mistralai/mistral-large-2-instruct",
+    "meta/muse-glimmer-30b",
+    "minimaxai/minimax-m3",
+    "microsoft/phi-3.5-moe-instruct",
+    "moonshotai/kimi-k2.6",
+    "deepseek-ai/deepseek-v4-flash-0731",
+    "openai/gpt-oss-20b",
+    "nvidia/llama-3.1-nemotron-70b-instruct",
+    "ibm/granite-3.0-8b-instruct",
+    "mistralai/mixtral-8x22b-v0.1",
+    "01-ai/yi-large",
+    "ai21labs/jamba-1.5-large-instruct",
+    "stepfun-ai/step-3.7-flash",
+    "databricks/dbrx-instruct",
+    "writer/palmyra-creative-122b",
+    "zyphra/zamba2-7b-instruct",
+]
 
 # The whole point: topic and length, nothing about tone, register or style.
 # Do NOT add "write like a student" or any style hint here. Any styling makes
@@ -51,6 +89,59 @@ TEMPERATURE = 1.0   # the model's own default register; low temp writes flatter 
 
 def build_prompt(topic, words):
     return PROMPT_TEMPLATE.format(topic=topic, words=words)
+
+
+def fetch_catalog(timeout=30):
+    """Model ids NIM is serving right now. The listing endpoint is public, so
+    this needs no key: only generation is billed."""
+    request = urllib.request.Request(NIM_CATALOG_URL, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        body = json.load(response)
+    return {entry["id"] for entry in body.get("data", [])}
+
+
+def vendor_of(model_id):
+    """'mistralai/mistral-large-2-instruct' -> 'mistralai'. The vendor is the
+    best cheap proxy for a distinct tokenizer and architecture."""
+    return model_id.split("/")[0]
+
+
+def pick_models(pool, count, seed=None):
+    """Choose `count` models from `pool`, spreading across vendors first.
+
+    Variety is the whole point: twelve paragraphs from one model would make the
+    AI class that model's habits rather than machine writing in general. Taking
+    one model per vendor before taking a second from any vendor maximises the
+    spread of tokenizers and architectures. Returns fewer than `count` only if
+    the pool itself is smaller, and repeats models (still vendor-spread) when
+    there are more topics than models.
+    """
+    rng = random.Random(seed)
+    by_vendor = {}
+    for model in pool:
+        by_vendor.setdefault(vendor_of(model), []).append(model)
+    for models in by_vendor.values():
+        rng.shuffle(models)
+
+    vendors = list(by_vendor)
+    rng.shuffle(vendors)
+
+    # Order the whole pool by rounds: every vendor's first model, then every
+    # vendor's second, and so on. Taking a prefix of this list therefore uses
+    # as many different vendors as possible.
+    ordered = []
+    round_number = 0
+    while len(ordered) < len(pool):
+        for vendor in vendors:
+            models = by_vendor[vendor]
+            if round_number < len(models):
+                ordered.append(models[round_number])
+        round_number += 1
+
+    if not ordered:
+        return []
+    # More topics than models: cycle the same spread order rather than stopping.
+    return [ordered[i % len(ordered)] for i in range(count)]
 
 
 def call_nim(prompt, model, api_key, timeout=120):
@@ -103,8 +194,10 @@ def main(argv=None):
     ap.add_argument("--prefix", default="a",
                     help="filename prefix for generated samples (default %(default)s)")
     ap.add_argument("--model", action="append", default=None,
-                    help="NIM model id; repeat to rotate models across topics "
-                         f"(default {DEFAULT_MODELS[0]})")
+                    help="pin a NIM model id; repeat to rotate. Default: sample "
+                         "popular models across vendors")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="seed the model sampling so a corpus can be regenerated")
     ap.add_argument("--words", type=int, default=110,
                     help="target words per paragraph (default %(default)s)")
     args = ap.parse_args(argv)
@@ -114,9 +207,31 @@ def main(argv=None):
         ap.error("NVIDIA_API_KEY is not set. Get a key at https://build.nvidia.com and "
                  "export it yourself; aidetect never stores it.")
 
-    models = args.model or DEFAULT_MODELS
     with open(args.topics, encoding="utf-8") as f:
         topics = json.load(f)
+
+    if args.model:
+        models = [args.model[i % len(args.model)] for i in range(len(topics))]
+    else:
+        try:
+            catalog = fetch_catalog()
+        except (urllib.error.URLError, urllib.error.HTTPError) as error:
+            raise SystemExit(f"could not read the NIM model catalog: {error}")
+        pool = [model for model in POPULAR_MODELS if model in catalog]
+        if not pool:
+            raise SystemExit(
+                "none of the known popular models are in NIM's catalog any more. "
+                "Pass --model explicitly, or refresh POPULAR_MODELS in generate.py.")
+        dropped = [model for model in POPULAR_MODELS if model not in catalog]
+        if dropped:
+            print(f"not served any more, skipping: {', '.join(dropped)}")
+        models = pick_models(pool, len(topics), args.seed)
+        vendors = sorted({vendor_of(model) for model in models})
+        print(f"sampling {len(set(models))} models across {len(vendors)} vendors: "
+              f"{', '.join(vendors)}")
+        if args.seed is None:
+            print("no --seed given, so this exact model assignment will not repeat")
+
     os.makedirs(args.out_dir, exist_ok=True)
 
     written = []
@@ -125,7 +240,7 @@ def main(argv=None):
         # th01 -> ta01: keep the number, swap the prefix, so the pairing is obvious
         number = "".join(c for c in human_id if c.isdigit())
         out_id = f"{args.prefix}{number}"
-        model = models[index % len(models)]
+        model = models[index]
         prompt = build_prompt(entry["topic"], args.words)
 
         print(f"{out_id}  {model}  {entry['topic'][:50]}...")
@@ -149,15 +264,19 @@ def main(argv=None):
             "subject": entry.get("subject"),
             "topic": entry["topic"],
             "generated_by": model,
+            "vendor": vendor_of(model),
             "temperature": TEMPERATURE,
             "prompt_template": PROMPT_TEMPLATE,
             "words_requested": args.words,
+            "seed": args.seed,
         })
 
     manifest_path = os.path.join(args.out_dir, "manifest.json")
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(written, f, indent=2)
+    used = sorted({row["generated_by"] for row in written})
     print(f"\nwrote {len(written)} samples + manifest -> {args.out_dir}")
+    print(f"models used ({len(used)}): {', '.join(used)}")
     print("check a couple by eye before calibrating: a refusal or a chatty preamble "
           "would poison the class.")
     return 0

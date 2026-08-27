@@ -196,9 +196,17 @@ no style guidance** — only a topic and a word count:
 ```bash
 export NVIDIA_API_KEY=nvapi-...     # you set it; aidetect only reads the env var
 aidetect generate --topics corpora/human-tech/manifest.json \
-                  --out-dir corpora/ai-tech --prefix ta \
-                  --model meta/llama-3.3-70b-instruct --model mistralai/mistral-large
+                  --out-dir corpora/ai-tech --prefix ta --seed 7
 ```
+
+By default it reads NIM's live catalog and **samples popular models across
+vendors**, one per topic — twelve topics typically means twelve different
+models from twelve vendors, so the class carries a spread of tokenizers,
+architectures and training mixes rather than one model's habits. Models that
+NIM has stopped serving are dropped rather than 404-ing mid-run, `--seed` makes
+an assignment reproducible, and `--model` pins exact ids instead. The Gemma
+family is never sampled: it is the detector's own pair, and scoring Gemma output
+with a Gemma observer/performer would flatter the detector.
 
 This exists because of a real failure. An earlier AI set was written by an
 assistant carrying house style rules (write tightly, no em dashes, active voice)
