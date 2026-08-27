@@ -512,6 +512,11 @@ def main(argv=None):
                     help="seed the model sampling so a corpus can be regenerated")
     ap.add_argument("--words", type=int, default=110,
                     help="target words per paragraph (default %(default)s)")
+    ap.add_argument("--append", action="store_true",
+                    help="merge into the manifest already in --out-dir instead of "
+                         "replacing it. Use when the human corpus has grown and only "
+                         "the new samples need an AI counterpart; regenerating the "
+                         "whole set costs hundreds of calls to no purpose.")
     ap.add_argument("--workers", type=int, default=1,
                     help="how many completions to request at once (default %(default)s, "
                          "i.e. sequential). Raise it when the model pool mixes fast and "
@@ -580,6 +585,19 @@ def main(argv=None):
         written.append(rows_by_index[index])
 
     manifest_path = os.path.join(args.out_dir, "manifest.json")
+    if args.append and os.path.exists(manifest_path):
+        with open(manifest_path, encoding="utf-8") as f:
+            existing = json.load(f)
+        fresh_ids = set()
+        for row in written:
+            fresh_ids.add(row["id"])
+        merged = []
+        for row in existing:
+            if row["id"] not in fresh_ids:      # a regenerated id replaces the old one
+                merged.append(row)
+        merged.extend(written)
+        merged.sort(key=lambda row: row["id"])
+        written = merged
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(written, f, indent=2)
     used = sorted({row["generated_by"] for row in written})

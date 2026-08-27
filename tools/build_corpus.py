@@ -330,6 +330,56 @@ def verify_noop(folder):
     return changed
 
 
+def text_layer_paragraphs(pdf_path):
+    """Paragraphs from a PDF that already has a real text layer.
+
+    Not every exemplar is a scan. Rendering a born-digital PDF to images and
+    OCRing it anyway would discard good text and import the measured -0.007
+    OCR shift for nothing, so those are read directly with pdftotext. Which
+    route a sample took is recorded in its `extraction` field, because mixing
+    the two silently would make the class impossible to audit.
+    """
+    import subprocess
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as work:
+        out_path = os.path.join(work, "text.txt")
+        subprocess.run(["pdftotext", pdf_path, out_path], check=True,
+                       capture_output=True)
+        raw = open(out_path, encoding="utf-8", errors="replace").read()
+
+    paragraphs = []
+    for block in re.split(r"\n\s*\n", raw):
+        text = re.sub(r"\s+", " ", block).strip()
+        if text:
+            paragraphs.append(text)
+    return paragraphs
+
+
+def scanned_paragraphs(tsv_path):
+    """Paragraphs and title from an OCR TSV, the scanned-exemplar route."""
+    pages = read_tsv(tsv_path)
+    pages_lines = []
+    for page in pages:
+        if page:
+            pages_lines.append(merge_lines(page))
+    running = find_running_text(pages_lines)
+    title = essay_title(running, pages_lines)
+    paragraphs = body_slice(document_paragraphs(pages_lines, running))
+    return paragraphs, title
+
+
+OCR_EXTRACTION = ("scanned PDF, 200 dpi, transcribed with macOS Vision OCR, paragraphs "
+                  "rebuilt from line geometry, footnote superscripts stripped, "
+                  "selected by lowest OCR-damage score within its third of the body")
+TEXT_EXTRACTION = ("born-digital PDF, text layer read with pdftotext, no OCR, "
+                   "selected by lowest damage score within its third of the body")
+
+IBO_DATE_EVIDENCE = ("IBO '50 Excellent Extended Essays'; "
+                     "'(c) International Baccalaureate Organization 2008' printed on every "
+                     "page and PDF CreationDate 2008; Wayback captures predate 2020.")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     ap.add_argument("--tsv-dir", required=True, help="folder of <essay>.tsv from ocr.swift")
@@ -344,6 +394,11 @@ def main(argv=None):
                     help="samples proven free of OCR damage; the strip rules must not "
                          "touch them. Kept outside corpora/ so rebuilding the corpus "
                          "cannot quietly erase this guarantee.")
+    ap.add_argument("--extra", default=None,
+                    help="JSON list of essays from outside the scanned collection. "
+                         "Each entry needs pdf, route ('scan' or 'text'), subject, "
+                         "topic, source_url and date_evidence. Lets the corpus grow "
+                         "beyond one archive without hand-editing a manifest.")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
 
@@ -365,11 +420,7 @@ def main(argv=None):
     manifest, number = [], 0
     for tsv in tsvs:
         name = os.path.splitext(os.path.basename(tsv))[0]
-        pages = read_tsv(tsv)
-        pages_lines = [merge_lines(p) for p in pages if p]
-        running = find_running_text(pages_lines)
-        title = essay_title(running, pages_lines)
-        paragraphs = body_slice(document_paragraphs(pages_lines, running))
+        paragraphs, title = scanned_paragraphs(tsv)
         picked = pick([strip_markers(p) for p in paragraphs], args.per_essay)
         if len(picked) < args.per_essay:
             print(f"  {name}: only {len(picked)} usable paragraphs of {len(paragraphs)}, skipped")
@@ -391,16 +442,66 @@ def main(argv=None):
                 "subject": subject,
                 "topic": title or subject,
                 "source_url": f"https://web.archive.org/web/2018id_/https://www.easthartford.org/uploaded/ciba/{name}.pdf",
-                "date_evidence": ("IBO '50 Excellent Extended Essays'; "
-                                  "'(c) International Baccalaureate Organization 2008' printed on every "
-                                  "page and PDF CreationDate 2008; Wayback captures predate 2020."),
-                "extraction": ("scanned PDF, 200 dpi, transcribed with macOS Vision OCR, paragraphs "
-                               "rebuilt from line geometry, footnote superscripts stripped, "
-                               "selected by lowest OCR-damage score within its third of the body"),
+                "date_evidence": IBO_DATE_EVIDENCE,
+                "extraction": OCR_EXTRACTION,
                 "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
                 "words": len(text.split()),
             })
         print(f"  {name}: {len(paragraphs)} body paragraphs -> {args.per_essay} samples  [{title}]")
+
+    # --- essays from outside the scanned collection ---
+    #
+    # These exist because rebuilding purely from one archive silently dropped
+    # every subject the archive does not cover. Counting samples caught nothing:
+    # the total went up while the coverage went down.
+    if args.extra:
+        with open(args.extra, encoding="utf-8") as f:
+            extras = json.load(f)
+        for entry in extras:
+            # a bare filename resolves against the scans folder, so the
+            # committed JSON stays machine-independent
+            pdf_path = entry["pdf"]
+            if not os.path.isabs(pdf_path):
+                scans = os.path.dirname(os.path.abspath(args.tsv_dir.rstrip("/")))
+                pdf_path = os.path.join(scans, pdf_path)
+            name = os.path.splitext(os.path.basename(pdf_path))[0]
+            if entry["route"] == "text":
+                paragraphs = body_slice(text_layer_paragraphs(pdf_path))
+                extraction = TEXT_EXTRACTION
+            else:
+                tsv = os.path.join(args.tsv_dir, name + ".tsv")
+                if not os.path.exists(tsv):
+                    print(f"  {name}: no OCR yet, run tools/run_ocr.sh on it first")
+                    continue
+                paragraphs, _title = scanned_paragraphs(tsv)
+                extraction = OCR_EXTRACTION
+            picked = pick([strip_markers(p) for p in paragraphs], args.per_essay)
+            if len(picked) < args.per_essay:
+                print(f"  {name}: only {len(picked)} usable paragraphs of "
+                      f"{len(paragraphs)}, skipped")
+                continue
+            number += 1
+            for letter, (index, text, position) in zip("abc", picked):
+                sample_id = f"{args.prefix}{number:02d}{letter}"
+                if not args.dry_run:
+                    with open(os.path.join(args.out_dir, f"{sample_id}.txt"), "w",
+                              encoding="utf-8") as f:
+                        f.write(text + "\n")
+                manifest.append({
+                    "id": sample_id,
+                    "source_essay": name,
+                    "position": position,
+                    "paragraph_index": index,
+                    "subject": entry["subject"],
+                    "topic": entry["topic"],
+                    "source_url": entry["source_url"],
+                    "date_evidence": entry["date_evidence"],
+                    "extraction": extraction,
+                    "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                    "words": len(text.split()),
+                })
+            print(f"  {name}: {len(paragraphs)} body paragraphs -> {args.per_essay} "
+                  f"samples  [{entry['subject']}, {entry['route']}]")
 
     if not args.dry_run:
         with open(os.path.join(args.out_dir, "manifest.json"), "w", encoding="utf-8") as f:

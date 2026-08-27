@@ -1168,5 +1168,44 @@
     "extraction": "scanned PDF, 200 dpi, transcribed with macOS Vision OCR, paragraphs rebuilt from line geometry, footnote superscripts stripped, selected by lowest OCR-damage score within its third of the body",
     "sha256": "755b707e5db1b58fc35d8cb8ceea02d3f19623f2e16b11f0b15a20ec0ba04658",
     "words": 155
+  },
+  {
+    "id": "h31a",
+    "source_essay": "econ_monopolistic",
+    "position": "introduction",
+    "paragraph_index": 30,
+    "subject": "Economics",
+    "topic": "Price competition among restaurants under monopolistic competition (Centro, Oberhausen)",
+    "source_url": "https://www.yellowsubmariner.com/uploads/1/2/2/5/12253383/ee_sample.pdf",
+    "date_evidence": "Born-digital PDF (Microsoft Word exported via Mac OS X Quartz PDFContext); PDF metadata CreationDate D:20160302 (2 March 2016), well before 2020.",
+    "extraction": "born-digital PDF, text layer read with pdftotext, no OCR, selected by lowest damage score within its third of the body",
+    "sha256": "689edd26b8cca078bf45c9f6662621042f4424c7d75f4b1fad15cc22d1279f89",
+    "words": 82
+  },
+  {
+    "id": "h31b",
+    "source_essay": "econ_monopolistic",
+    "position": "analysis",
+    "paragraph_index": 175,
+    "subject": "Economics",
+    "topic": "Price competition among restaurants under monopolistic competition (Centro, Oberhausen)",
+    "source_url": "https://www.yellowsubmariner.com/uploads/1/2/2/5/12253383/ee_sample.pdf",
+    "date_evidence": "Born-digital PDF (Microsoft Word exported via Mac OS X Quartz PDFContext); PDF metadata CreationDate D:20160302 (2 March 2016), well before 2020.",
+    "extraction": "born-digital PDF, text layer read with pdftotext, no OCR, selected by lowest damage score within its third of the body",
+    "sha256": "5b635cf7e833caf681dc6ca44429151c77fb04283f084509e9d0423e5f65ca5e",
+    "words": 72
+  },
+  {
+    "id": "h31c",
+    "source_essay": "econ_monopolistic",
+    "position": "conclusion",
+    "paragraph_index": 181,
+    "subject": "Economics",
+    "topic": "Price competition among restaurants under monopolistic competition (Centro, Oberhausen)",
+    "source_url": "https://www.yellowsubmariner.com/uploads/1/2/2/5/12253383/ee_sample.pdf",
+    "date_evidence": "Born-digital PDF (Microsoft Word exported via Mac OS X Quartz PDFContext); PDF metadata CreationDate D:20160302 (2 March 2016), well before 2020.",
+    "extraction": "born-digital PDF, text layer read with pdftotext, no OCR, selected by lowest damage score within its third of the body",
+    "sha256": "87f4fdbc1fd6b60b838281bf325fe5fc53a6552a5d58bb6e5afdeb762b45a19d",
+    "words": 74
   }
 ]
