@@ -1,7 +1,7 @@
 {
   "threshold": 0.5,
-  "amber": 0.4215,
-  "n_windows": 42,
-  "n_essays": 14,
-  "human_p90": 0.4215
+  "amber": 0.5,
+  "n_windows": 65,
+  "n_essays": 17,
+  "human_p90": 0.7448
 }

@@ -287,14 +287,11 @@ sample, so any threshold fitted on it can be audited.
 
 ### Genre thresholds: `--tag`
 
-The boundary is not only per model pair, it is **per genre**. Fitted on 12 real
-pre-2013 technical Extended Essay paragraphs (maths, CS, physics, chemistry,
-ITGS), human technical prose means **0.828** where humanities prose means
-**0.901**. The corpus has since grown to 42 technical and 90 humanities
-paragraphs; these Binoculars numbers are the earlier fit and have not been
-refitted on it yet. The humanities threshold of 0.826 therefore sits almost exactly at the
-*mean* of genuine human technical writing, so a maths or CS essay flags roughly
-half its paragraphs no matter who wrote it.
+The boundary is not only per model pair, it is **per genre**, though the effect
+is much smaller than the first fit suggested. Both tags are now fitted on the
+full rebuilt corpora: 93 humanities paragraphs from 31 essays and 51 technical
+ones from 17. Human technical prose means **0.888** where humanities prose means
+**0.914**, a gap of 0.026 where the 12-paragraph fit read 0.073.
 
 `--tag` keeps a second calibration beside the first instead of overwriting it:
 
@@ -304,21 +301,29 @@ aidetect calibrate --human-dir corpora/human-tech --ai-dir corpora/ai-tech \
 aidetect check "IA Graph Theory.docx" --tag tech      # judged against technical prose
 ```
 
-| calibration | threshold | human mean | AI mean | separation |
+| calibration | threshold | human mean | AI mean | held-out accuracy |
 |---|---|---|---|---|
-| default (humanities EEs) | 0.826 | 0.901 | 0.692 | 92% |
-| `--tag tech` (maths/CS/science) | 0.753 | 0.828 | 0.650 | 92% |
+| default (humanities EEs) | 0.784 | 0.914 | 0.664 | 91.9% over 31 essays |
+| `--tag tech` (maths/CS/science) | 0.802 | 0.888 | 0.713 | 95.1% over 17 essays |
 
-Measured on four of my own drafts, moving to the technical threshold cut the
-flag rate on the maths IA from 28% to 13% and the CS IA from 51% to 32%, while
-the two humanities drafts (3% and 13%) did not move at all.
+Both accuracies are leave-one-essay-out, not training fits. The tech tag holds
+up better, and its held-out number equals its in-sample one, meaning no single
+essay is carrying the cutoff.
 
-Both separate 92%, so the genre effect is a **shift in level, not a loss of
-discrimination**: technical prose scores lower for everyone, and once the
-threshold moves with it the detector works just as well. An earlier run measured
-79% here and was wrongly read as "Binoculars is weak on technical prose" — that
-number came from a contaminated AI class, and the story is in
-`corpora/ai-tech/README.md`.
+**The ordering flipped when the corpora grew.** On 12 paragraphs a side the tech
+threshold sat *below* the humanities one (0.753 against 0.826), which read as
+"technical prose scores lower for everyone, so move the boundary down with it".
+On the full corpora it sits slightly *above* (0.802 against 0.784), because the
+technical AI class scores higher too (0.713 against 0.664) and closes the gap
+from the other end. The genre split is still worth keeping, but as a small
+correction rather than the large shift the first fit implied. The flag rates
+measured on four of my own drafts (maths IA 28% to 13%, CS IA 51% to 32%,
+humanities drafts unmoved) were taken against the old thresholds and have not
+been re-measured against these.
+
+An earlier run measured 79% for the tech tag and was wrongly read as
+"Binoculars is weak on technical prose": that number came from a contaminated AI
+class, and the story is in `corpora/ai-tech/README.md`.
 
 desklib stays the primary detector; Binoculars is now a usable second opinion
 rather than a dead end. The calibration sets are not shipped with the package —
@@ -333,17 +338,20 @@ never crosses desklib's own 0.5 red line:
 
 | band | windows | essays | human p90 | amber edge |
 |---|---|---|---|---|
-| default (humanities) | 95 | 30 | 0.6013 | 0.5, i.e. **empty** |
-| `--tag tech` | 42 | 14 | 0.4215 | **0.4215** |
+| default (humanities) | 107 | 31 | 0.8415 | 0.5, i.e. **empty** |
+| `--tag tech` | 65 | 17 | 0.7448 | 0.5, i.e. **empty** |
 
-The humanities band is empty and will stay empty. Nine in ten human windows are
-supposed to fall below the edge, but the 90th percentile of provably human 2008
-Extended Essay prose sits *above* desklib's own boundary, so there is no room
-below red for a band to live in. That is a limit of the model, not of the
-corpus: more human data moves the number down but not past 0.5. Fitted on a
-dozen windows it read 0.7365, so the old figure was inflated rather than merely
-imprecise. Technical prose scores lower across the board, which is why the tech
-band has somewhere to sit.
+**Both bands are empty, in both genres.** Nine in ten human windows are supposed
+to fall below the edge, but the 90th percentile of provably human 2008 Extended
+Essay prose sits *above* desklib's own 0.5 boundary either way, so there is no
+room below red for a band to live in. That is a limit of the model, not of the
+corpus.
+
+The tech band briefly looked real. Fitted on 42 windows it read 0.4215, and this
+README said so. At 65 windows across 17 essays it reads 0.7448 and clamps to red
+like the humanities one. Take the conclusion, which has held at every corpus
+size, and not the percentile itself, which has moved by more than 0.3 each time
+the corpus grew.
 
 ### Three paragraphs per essay, and why they are grouped
 

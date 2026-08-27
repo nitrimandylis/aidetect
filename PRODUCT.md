@@ -114,9 +114,11 @@ that need no model stay instant.
 - No computer science essay is in either human corpus. The three that were came
   from outside the IBO collection and did not survive the rebuild, so a CS IA is
   judged against ITGS and maths as the nearest certified-human genre.
-- The desklib amber band is empty for humanities prose and will stay that way.
-  With 95 windows behind it the human 90th percentile is 0.6013, above desklib's
-  own 0.5 boundary, so desklib flags more than a tenth of provably human 2008
-  Extended Essay prose. That is a limit of the model, not of the corpus.
+- The desklib amber band is empty in both genres. The human 90th percentile is
+  0.8415 over 107 humanities windows and 0.7448 over 65 technical ones, both
+  above desklib's own 0.5 boundary, so desklib flags well over a tenth of
+  provably human 2008 Extended Essay prose whatever the subject. That is a limit
+  of the model, not of the corpus. The p90 itself is unstable as the corpus
+  grows, so quote the finding rather than the number.
 
 [Ejhfast/fast-ai-detector]: https://github.com/Ejhfast/fast-ai-detector
