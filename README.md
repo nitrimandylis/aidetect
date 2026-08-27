@@ -57,7 +57,7 @@ reminder: directional only, not a Turnitin score.
 | 02 | **docx + txt input** | reads Word files through the same walker `count` uses — no cover page, no contents, no headings, no bibliography — or plain text split on blank lines |
 | 03 | **prose extractor** | `aidetect extract` dumps a draft's countable prose to a `.txt` so you can eyeball exactly what got counted |
 | 04 | **offline after setup** | first run pulls ~1.5GB of model, every run after is airgapped — your essay never leaves the laptop |
-| 05 | **second opinion** | cross-check against the lighter [Ejhfast/fast-ai-detector] when one model's paranoia isn't enough |
+| 05 | **optional third opinion** | [Ejhfast/fast-ai-detector], a separate lighter tool, for when both built-in detectors agree and you still want another read. Not part of any verdict |
 | 06 | **Binoculars (Gemma 4)** | a training-free perplexity-ratio detector — near chance with small Qwen pairs, but 92% on the labelled set once swapped to a Gemma 4 pair; see below |
 | 07 | **IB word count** | `aidetect count` (`--json` for scripts and agents) counts what the IB counts — no cover page, contents, headings, captions, tables, footnotes, citations or bibliography — and splits the total by section and sub-section, so an over-long draft tells you *where* |
 | 08 | **Turnitin-shaped segments** | `score --segments` slides overlapping 7-sentence windows across the prose — short connective paragraphs included, the ones paragraph mode skips — and reports *% of prose in flagged segments*, the same shape as Turnitin's headline number |
@@ -125,16 +125,31 @@ all is counted whole, with a note, rather than reporting a confident zero.
 
 ```mermaid
 flowchart LR
-    A[.docx] --> B[walk<br/>structure: drop cover,<br/>contents, headings,<br/>captions, bibliography]
-    B --> C[aidetect count<br/>strip citations,<br/>total by section]
-    B --> D[is_prose<br/>style: >= 25 words,<br/>no bullets or scaffolding]
-    D --> E[desklib DeBERTa<br/>mean-pool + sigmoid]
-    E --> F[per-paragraph<br/>0-1 score + flags]
+    A[".docx"] --> B["walk()<br/>structure: drop cover, contents,<br/>headings, captions, bibliography"]
+    B --> C["aidetect count<br/>strip citations,<br/>total by section"]
+    B --> P["is_prose()<br/>style floor: >= 25 words,<br/>no bullets or scaffolding"]
+    B --> S["sentence windows<br/>7 sentences, stride 3<br/>no length floor"]
+    P --> D1["desklib DeBERTa<br/>per paragraph"]
+    P --> BN["Binoculars<br/>Gemma 4 pair<br/>per paragraph"]
+    S --> D2["desklib DeBERTa<br/>per window"]
+    D1 --> O1["aidetect score<br/>0-1 + flags"]
+    D2 --> O2["score --segments<br/>% of prose flagged"]
+    BN --> O3["aidetect bino<br/>vs calibrated threshold"]
+    O2 --> K["aidetect check<br/>worst opinion<br/>per sentence"]
+    O3 --> K
 ```
 
-One walker decides what is *in* the document; two thin filters decide what each
-job wants from it. A 6-word sentence is a word the examiner counts and noise to
-the detector, which is the whole reason the split exists.
+One walker decides what is *in* the document; everything downstream is a
+different question asked of the same paragraphs. A 6-word sentence is a word the
+examiner counts and noise to a paragraph scorer, which is why `count` and
+`is_prose` are separate filters rather than one.
+
+The two scoring paths differ on purpose. **Paragraph mode** applies the 25-word
+floor, because a fragment scores as noise on its own. **Segment mode** drops it
+and slides overlapping windows instead, so those same short connective sentences
+get scored inside a window with their neighbours — and formulaic linking prose is
+exactly what detectors flag. `check` runs the segment path and Binoculars
+together and takes the worse verdict per sentence.
 
 | file | job |
 |---|---|
@@ -304,8 +319,10 @@ proves you are not an outlier, nothing more.
 
 **Stack:** python · pytorch · transformers · mlx-vlm · desklib DeBERTa
 
-The lighter cross-check tool lives at [Ejhfast/fast-ai-detector] — it's a
-separate repo, not vendored here.
+The cross-check that matters is built in: `aidetect check` runs both detectors
+and takes the worse verdict. [Ejhfast/fast-ai-detector] is a separate, lighter
+tool in its own repo, not vendored and not part of `check`'s verdict — reach for
+it only when you want a read from a model neither detector shares.
 
 ---
 
