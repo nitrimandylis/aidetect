@@ -1,15 +1,5 @@
 # corpora/
 
-> **`ai/` and `ai-tech/` are being regenerated.**
->
-> The human halves were rebuilt from 44 scanned IB exemplars (132 paragraphs,
-> three per essay), so the previous 12-sample AI sets no longer match anything:
-> their `matches` ids point at human samples that do not exist. **Do not fit a
-> Binoculars threshold until the regenerated sets have landed**, or the two
-> classes will be scored against unrelated topics.
->
-> The desklib amber bands do NOT depend on the AI half and are already refitted.
-
 ## What is in here
 
 | folder | what | n |
