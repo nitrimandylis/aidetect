@@ -32,9 +32,12 @@ temperature, so a calibration fitted on this set can be audited or reproduced.
 """
 
 import argparse
+import collections
 import json
 import os
 import random
+import re
+import time
 import urllib.error
 import urllib.request
 
@@ -52,26 +55,29 @@ NIM_CATALOG_URL = "https://integrate.api.nvidia.com/v1/models"
 #     own family's output is unusually unsurprising to it.
 #   - code, embedding, vision, safety-guard, reward, translate and parse models,
 #     which either cannot hold a conversation or write nothing like essay prose.
+# Ordered so the models most accounts can actually call come first: a free NIM
+# account 404s on much of the catalog, and a model that is listed but not
+# callable costs a wasted request before the fallback kicks in.
 POPULAR_MODELS = [
     "deepseek-ai/deepseek-v4-pro-0813",
     "moonshotai/kimi-k3",
-    "openai/gpt-oss-120b",
     "nvidia/nemotron-3-super-120b-a12b",
-    "mistralai/mistral-large-2-instruct",
     "meta/muse-glimmer-30b",
     "minimaxai/minimax-m3",
-    "microsoft/phi-3.5-moe-instruct",
-    "moonshotai/kimi-k2.6",
-    "deepseek-ai/deepseek-v4-flash-0731",
+    "stepfun-ai/step-3.7-flash",
     "openai/gpt-oss-20b",
-    "nvidia/llama-3.1-nemotron-70b-instruct",
+    "nvidia/nemotron-3-ultra-550b-a55b",
+    "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "nvidia/nemotron-3-nano-30b-a3b",
+    "openai/gpt-oss-120b",
+    "deepseek-ai/deepseek-v4-flash-0731",
+    "moonshotai/kimi-k2.6",
+    "mistralai/mistral-large-2-instruct",
+    "microsoft/phi-3.5-moe-instruct",
     "ibm/granite-3.0-8b-instruct",
-    "mistralai/mixtral-8x22b-v0.1",
     "01-ai/yi-large",
     "ai21labs/jamba-1.5-large-instruct",
-    "stepfun-ai/step-3.7-flash",
     "databricks/dbrx-instruct",
-    "writer/palmyra-creative-122b",
     "zyphra/zamba2-7b-instruct",
 ]
 
@@ -85,6 +91,9 @@ PROMPT_TEMPLATE = (
 )
 
 TEMPERATURE = 1.0   # the model's own default register; low temp writes flatter prose
+
+RATE_LIMIT_RETRIES = 3    # a 429 means "slow down", not "this model is unusable"
+RATE_LIMIT_BACKOFF = 20   # seconds, multiplied by the attempt number
 
 
 def build_prompt(topic, words):
@@ -168,7 +177,65 @@ def call_nim(prompt, model, api_key, timeout=120):
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
         body = json.load(response)
-    return body["choices"][0]["message"]["content"].strip()
+    choices = body.get("choices") or []
+    if not choices:
+        return ""
+    # Reasoning models can answer with content=null and put their thinking in
+    # reasoning_content. That is not prose for the corpus, so it counts as empty
+    # and the caller drops the model.
+    content = choices[0].get("message", {}).get("content")
+    return content.strip() if content else ""
+
+
+def substitute(pool, unavailable, vendor_counts):
+    """Another model to try after one turned out to be uncallable.
+
+    Draws from the WHOLE pool, not just the models already assigned, and picks
+    the least-used vendor first. Half of NIM's catalog 404s per account, so
+    without this the corpus collapses onto the two or three models that happen
+    to answer. Returns None when nothing is left.
+    """
+    candidates = [model for model in pool if model not in unavailable]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda model: (vendor_counts[vendor_of(model)], model))
+
+
+# Openings that mean the model is talking about the task instead of doing it:
+# a planning trace, a preamble, or a refusal. One of these in the corpus would
+# be scored as "AI prose" when it is really chat scaffolding, which teaches the
+# threshold the wrong thing.
+META_MARKERS = (
+    "we need to", "let's", "let me", "i need to", "i should", "i'll write",
+    "the user", "as an ai", "here is", "here's", "sure,", "certainly,",
+    "okay,", "first, i", "no title", "word count", "i cannot", "i can't",
+)
+
+
+def looks_like_prose(text):
+    """False when the model answered with commentary rather than the paragraph."""
+    opening = " ".join(text.split())[:300].lower()
+    return not any(marker in opening for marker in META_MARKERS)
+
+
+def trim_to_words(text, budget):
+    """Keep whole sentences up to roughly `budget` words.
+
+    Models routinely overshoot the requested length, and the human samples are
+    fixed-size excerpts from long essays. Without this the AI class runs ~50%
+    longer than the human class and the fitted threshold partly encodes "long
+    means machine", which would not generalise to a student's own paragraphs.
+
+    Whole sentences only, and never a rewrite: this excerpts, it does not edit.
+    """
+    sentences = [s for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
+    kept, count = [], 0
+    for sentence in sentences:
+        kept.append(sentence)
+        count += len(sentence.split())
+        if count >= budget:
+            break
+    return " ".join(kept)
 
 
 def clean(text):
@@ -211,6 +278,7 @@ def main(argv=None):
         topics = json.load(f)
 
     if args.model:
+        pool = list(dict.fromkeys(args.model))
         models = [args.model[i % len(args.model)] for i in range(len(topics))]
     else:
         try:
@@ -234,6 +302,9 @@ def main(argv=None):
 
     os.makedirs(args.out_dir, exist_ok=True)
 
+    unavailable = set()                        # models this account cannot call
+    rate_limited = collections.Counter()       # per-model 429 retries so far
+    vendor_counts = collections.Counter()      # vendors used so far, to keep the spread
     written = []
     for index, entry in enumerate(topics):
         human_id = entry["id"]
@@ -243,18 +314,66 @@ def main(argv=None):
         model = models[index]
         prompt = build_prompt(entry["topic"], args.words)
 
-        print(f"{out_id}  {model}  {entry['topic'][:50]}...")
-        try:
-            text = clean(call_nim(prompt, model, api_key))
-        except urllib.error.HTTPError as error:
-            # the body usually says which model id is wrong or which limit was hit
-            detail = error.read().decode("utf-8", "replace")[:300]
-            raise SystemExit(f"NIM returned {error.code} for model {model!r}: {detail}")
-        except urllib.error.URLError as error:
-            raise SystemExit(f"could not reach NIM: {error.reason}")
-        if not text:
-            raise SystemExit(f"{out_id}: model returned nothing; corpus left incomplete")
+        # The catalog lists what NIM serves, not what THIS account may call, so a
+        # model can still 404. Swap it for another vendor's and carry on: aborting
+        # here would leave a half-written corpus that looks complete.
+        while model in unavailable:
+            model = substitute(pool, unavailable, vendor_counts)
+            if model is None:
+                raise SystemExit("every candidate model failed; corpus left incomplete")
+        text = ""
+        while not text:
+            print(f"{out_id}  {model}  {entry['topic'][:50]}...")
+            try:
+                text = clean(call_nim(prompt, model, api_key))
+            except urllib.error.HTTPError as error:
+                detail = error.read().decode("utf-8", "replace")[:200]
+                if error.code in (401, 403) and "account" not in detail:
+                    raise SystemExit(f"NIM rejected the API key ({error.code}): {detail}")
+                if error.code == 429 and rate_limited[model] < RATE_LIMIT_RETRIES:
+                    # transient: the model works, we are just going too fast.
+                    # Dropping it here would silently shrink the corpus's variety.
+                    rate_limited[model] += 1
+                    wait = RATE_LIMIT_BACKOFF * rate_limited[model]
+                    print(f"      429 for {model}, waiting {wait}s and retrying")
+                    time.sleep(wait)
+                    continue
+                print(f"      {error.code} for {model}, dropping it: {detail[:90]}")
+                unavailable.add(model)
+                model = substitute(pool, unavailable, vendor_counts)
+            except TimeoutError:
+                # a cold or heavily loaded model can sit past the timeout; give it
+                # one more go, then move on rather than stalling the whole corpus
+                rate_limited[model] += 1
+                if rate_limited[model] <= 1:
+                    print(f"      {model} timed out, retrying once")
+                    continue
+                print(f"      {model} timed out again, dropping it")
+                unavailable.add(model)
+                model = substitute(pool, unavailable, vendor_counts)
+            except urllib.error.URLError as error:
+                if isinstance(error.reason, TimeoutError):
+                    print(f"      {model} timed out, dropping it")
+                    unavailable.add(model)
+                    model = substitute(pool, unavailable, vendor_counts)
+                else:
+                    raise SystemExit(f"could not reach NIM: {error.reason}")
+            else:
+                if text and not looks_like_prose(text):
+                    # a reasoning trace or a preamble leaked into content
+                    print(f"      {model} answered with commentary, dropping it")
+                    text = ""
+                if not text:
+                    # answered, but with nothing usable (a refusal, or a reasoning
+                    # model that put everything in reasoning_content)
+                    print(f"      {model} returned no prose, dropping it")
+                    unavailable.add(model)
+                    model = substitute(pool, unavailable, vendor_counts)
+            if model is None:
+                raise SystemExit("every candidate model failed; corpus left incomplete")
 
+        vendor_counts[vendor_of(model)] += 1
+        text = trim_to_words(text, args.words)
         path = os.path.join(args.out_dir, f"{out_id}.txt")
         with open(path, "w", encoding="utf-8") as f:
             f.write(text + "\n")
@@ -268,6 +387,7 @@ def main(argv=None):
             "temperature": TEMPERATURE,
             "prompt_template": PROMPT_TEMPLATE,
             "words_requested": args.words,
+            "words_kept": len(text.split()),
             "seed": args.seed,
         })
 

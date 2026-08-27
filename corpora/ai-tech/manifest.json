@@ -3,72 +3,156 @@
     "id": "ta01",
     "matches": "th01",
     "subject": "Mathematics",
-    "topic": "Whether a 3m x 3m field seeded with two weed parcels can become entirely overgrown"
+    "topic": "Whether a 3m x 3m field seeded with two weed parcels can become entirely overgrown",
+    "generated_by": "deepseek-ai/deepseek-v4-pro-0813",
+    "vendor": "deepseek-ai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 130,
+    "seed": 7
   },
   {
     "id": "ta02",
     "matches": "th02",
     "subject": "Mathematics",
-    "topic": "Alhazen's billiard problem and reflection within a circle"
+    "topic": "Alhazen's billiard problem and reflection within a circle",
+    "generated_by": "nvidia/nemotron-3-ultra-550b-a55b",
+    "vendor": "nvidia",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 116,
+    "seed": 7
   },
   {
     "id": "ta03",
     "matches": "th03",
     "subject": "Mathematics",
-    "topic": "The 3n+1 (Collatz) conjecture and the behaviour of its stopping time function"
+    "topic": "The 3n+1 (Collatz) conjecture and the behaviour of its stopping time function",
+    "generated_by": "meta/muse-glimmer-30b",
+    "vendor": "meta",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 104,
+    "seed": 7
   },
   {
     "id": "ta04",
     "matches": "th04",
     "subject": "Mathematics",
-    "topic": "Game-theoretic analysis of two-person zero-sum poker models"
+    "topic": "Game-theoretic analysis of two-person zero-sum poker models",
+    "generated_by": "minimaxai/minimax-m3",
+    "vendor": "minimaxai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 124,
+    "seed": 7
   },
   {
     "id": "ta05",
     "matches": "th05",
     "subject": "Chemistry",
-    "topic": "Optical rotation of mixed glucose and fructose solutions measured by polarimetry"
+    "topic": "Optical rotation of mixed glucose and fructose solutions measured by polarimetry",
+    "generated_by": "moonshotai/kimi-k3",
+    "vendor": "moonshotai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 127,
+    "seed": 7
   },
   {
     "id": "ta06",
     "matches": "th06",
     "subject": "ITGS",
-    "topic": "Economic factors behind the digital divide in India"
+    "topic": "Economic factors behind the digital divide in India",
+    "generated_by": "deepseek-ai/deepseek-v4-pro-0813",
+    "vendor": "deepseek-ai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 115,
+    "seed": 7
   },
   {
     "id": "ta07",
     "matches": "th07",
     "subject": "Physics",
-    "topic": "How bow efficiency changes as draw length increases"
+    "topic": "How bow efficiency changes as draw length increases",
+    "generated_by": "meta/muse-glimmer-30b",
+    "vendor": "meta",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 117,
+    "seed": 7
   },
   {
     "id": "ta08",
     "matches": "th08",
     "subject": "Computer Science",
-    "topic": "Architecture of artificial neural networks compared with biological ones"
+    "topic": "Architecture of artificial neural networks compared with biological ones",
+    "generated_by": "minimaxai/minimax-m3",
+    "vendor": "minimaxai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 130,
+    "seed": 7
   },
   {
     "id": "ta09",
     "matches": "th09",
     "subject": "Computer Science",
-    "topic": "Whether quantum computers render current cryptographic methods useless (Shor's algorithm)"
+    "topic": "Whether quantum computers render current cryptographic methods useless (Shor's algorithm)",
+    "generated_by": "deepseek-ai/deepseek-v4-pro-0813",
+    "vendor": "deepseek-ai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 123,
+    "seed": 7
   },
   {
     "id": "ta10",
     "matches": "th10",
     "subject": "Computer Science",
-    "topic": "Cellular automata as a way to simulate replicating, evolving organisms"
+    "topic": "Cellular automata as a way to simulate replicating, evolving organisms",
+    "generated_by": "moonshotai/kimi-k3",
+    "vendor": "moonshotai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 128,
+    "seed": 7
   },
   {
     "id": "ta11",
     "matches": "th11",
     "subject": "ITGS",
-    "topic": "Wireless in Local Loop as a way to bring telephony and internet to rural India"
+    "topic": "Wireless in Local Loop as a way to bring telephony and internet to rural India",
+    "generated_by": "nvidia/nemotron-3-nano-30b-a3b",
+    "vendor": "nvidia",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 102,
+    "seed": 7
   },
   {
     "id": "ta12",
     "matches": "th12",
     "subject": "Chemistry",
-    "topic": "Presentation of polarimetry results for glucose and fructose mixtures"
+    "topic": "Presentation of polarimetry results for glucose and fructose mixtures",
+    "generated_by": "minimaxai/minimax-m3",
+    "vendor": "minimaxai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 138,
+    "seed": 7
   }
 ]

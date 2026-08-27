@@ -4,11 +4,11 @@
     "mlx-community/gemma-4-e2b-it-qat-OptiQ-4bit"
   ],
   "backend": "mlx",
-  "threshold": 0.8261,
-  "amber": 0.8508,
+  "threshold": 0.7532,
+  "amber": 0.7534,
   "accuracy": 0.9167,
   "n_human": 12,
   "n_ai": 12,
-  "human_mean": 0.9005,
-  "ai_mean": 0.6924
+  "human_mean": 0.8277,
+  "ai_mean": 0.6504
 }

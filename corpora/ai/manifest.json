@@ -3,72 +3,156 @@
     "id": "a01",
     "matches": "h01",
     "subject": "English",
-    "topic": "Jane Austen's use of the outdoors in Emma and what it reveals about characters"
+    "topic": "Jane Austen's use of the outdoors in Emma and what it reveals about characters",
+    "generated_by": "deepseek-ai/deepseek-v4-pro-0813",
+    "vendor": "deepseek-ai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 143,
+    "seed": 11
   },
   {
     "id": "a02",
     "matches": "h02",
     "subject": "English",
-    "topic": "Marlowe's Dr. Faustus, the morality-play tradition and attitudes to spirituality"
+    "topic": "Marlowe's Dr. Faustus, the morality-play tradition and attitudes to spirituality",
+    "generated_by": "openai/gpt-oss-120b",
+    "vendor": "openai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 112,
+    "seed": 11
   },
   {
     "id": "a03",
     "matches": "h03",
     "subject": "History",
-    "topic": "Socio-political context of the Dreyfus Affair in 1890s France"
+    "topic": "Socio-political context of the Dreyfus Affair in 1890s France",
+    "generated_by": "meta/muse-glimmer-30b",
+    "vendor": "meta",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 111,
+    "seed": 11
   },
   {
     "id": "a04",
     "matches": "h04",
     "subject": "History",
-    "topic": "How early football in Costa Rica served government social control and national identity"
+    "topic": "How early football in Costa Rica served government social control and national identity",
+    "generated_by": "deepseek-ai/deepseek-v4-pro-0813",
+    "vendor": "deepseek-ai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 120,
+    "seed": 11
   },
   {
     "id": "a05",
     "matches": "h05",
     "subject": "Biology",
-    "topic": "Circadian rhythms and internal biological clocks as background to a hamster experiment"
+    "topic": "Circadian rhythms and internal biological clocks as background to a hamster experiment",
+    "generated_by": "moonshotai/kimi-k3",
+    "vendor": "moonshotai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 116,
+    "seed": 11
   },
   {
     "id": "a06",
     "matches": "h06",
     "subject": "Biology",
-    "topic": "Behaviour and territoriality of the freshwater prawn Macrobrachium rosenbergii"
+    "topic": "Behaviour and territoriality of the freshwater prawn Macrobrachium rosenbergii",
+    "generated_by": "nvidia/nemotron-3-nano-30b-a3b",
+    "vendor": "nvidia",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 115,
+    "seed": 11
   },
   {
     "id": "a07",
     "matches": "h07",
     "subject": "Physics",
-    "topic": "Locating the centre of mass as a step in analysing maximum braking on a bicycle"
+    "topic": "Locating the centre of mass as a step in analysing maximum braking on a bicycle",
+    "generated_by": "moonshotai/kimi-k3",
+    "vendor": "moonshotai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 114,
+    "seed": 11
   },
   {
     "id": "a08",
     "matches": "h08",
     "subject": "Physics",
-    "topic": "Using an ultrasonic motion detector to measure a cylinder rolling down an incline"
+    "topic": "Using an ultrasonic motion detector to measure a cylinder rolling down an incline",
+    "generated_by": "moonshotai/kimi-k3",
+    "vendor": "moonshotai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 131,
+    "seed": 11
   },
   {
     "id": "a09",
     "matches": "h09",
     "subject": "Geography",
-    "topic": "Why remoteness only partly explains low retention of indigenous students in Queensland"
+    "topic": "Why remoteness only partly explains low retention of indigenous students in Queensland",
+    "generated_by": "nvidia/nemotron-3-nano-30b-a3b",
+    "vendor": "nvidia",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 108,
+    "seed": 11
   },
   {
     "id": "a10",
     "matches": "h10",
     "subject": "Psychology",
-    "topic": "Definition and prevalence of hate crimes and harassment against LGBT youth"
+    "topic": "Definition and prevalence of hate crimes and harassment against LGBT youth",
+    "generated_by": "deepseek-ai/deepseek-v4-pro-0813",
+    "vendor": "deepseek-ai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 126,
+    "seed": 11
   },
   {
     "id": "a11",
     "matches": "h11",
     "subject": "Philosophy",
-    "topic": "The interdependence of the Apollonian and Dionysian in Nietzsche's dualism"
+    "topic": "The interdependence of the Apollonian and Dionysian in Nietzsche's dualism",
+    "generated_by": "deepseek-ai/deepseek-v4-pro-0813",
+    "vendor": "deepseek-ai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 120,
+    "seed": 11
   },
   {
     "id": "a12",
     "matches": "h12",
     "subject": "Economics",
-    "topic": "Price competition among restaurants under monopolistic competition (Centro, Oberhausen)"
+    "topic": "Price competition among restaurants under monopolistic competition (Centro, Oberhausen)",
+    "generated_by": "moonshotai/kimi-k3",
+    "vendor": "moonshotai",
+    "temperature": 1.0,
+    "prompt_template": "Write a single paragraph of about {words} words from an IB Extended Essay on the following topic:\n\n{topic}\n\nReturn only the paragraph itself, with no title, heading or commentary.",
+    "words_requested": 110,
+    "words_kept": 117,
+    "seed": 11
   }
 ]

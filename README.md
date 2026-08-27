@@ -58,7 +58,7 @@ reminder: directional only, not a Turnitin score.
 | 03 | **prose extractor** | `aidetect extract` dumps a draft's countable prose to a `.txt` so you can eyeball exactly what got counted |
 | 04 | **offline after setup** | first run pulls ~1.5GB of model, every run after is airgapped — your essay never leaves the laptop |
 | 05 | **second opinion** | cross-check against the lighter [Ejhfast/fast-ai-detector] when one model's paranoia isn't enough |
-| 06 | **Binoculars (Gemma 4)** | a training-free perplexity-ratio detector — near chance with small Qwen pairs, but 96% on the labelled set once swapped to a Gemma 4 pair; see below |
+| 06 | **Binoculars (Gemma 4)** | a training-free perplexity-ratio detector — near chance with small Qwen pairs, but 92% on the labelled set once swapped to a Gemma 4 pair; see below |
 | 07 | **IB word count** | `aidetect count` (`--json` for scripts and agents) counts what the IB counts — no cover page, contents, headings, captions, tables, footnotes, citations or bibliography — and splits the total by section and sub-section, so an over-long draft tells you *where* |
 | 08 | **Turnitin-shaped segments** | `score --segments` slides overlapping 7-sentence windows across the prose — short connective paragraphs included, the ones paragraph mode skips — and reports *% of prose in flagged segments*, the same shape as Turnitin's headline number |
 | 09 | **combined verdict** | `aidetect check` runs the desklib segments and Binoculars over the same draft and takes the worst opinion per sentence — disagreement between detectors surfaces instead of averaging away |
@@ -150,7 +150,7 @@ the detector, which is the whole reason the split exists.
 | `src/aidetect/generate.py` | generates the AI half of a calibration set through NVIDIA NIM, with no system prompt and no style guidance, so the adversary stays fair |
 | `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package |
 | `src/aidetect/thresholds/` | the thresholds shipped with the package; a threshold you fit yourself wins over these |
-| `corpora/` | my labelled calibration sets. Repo-only, deliberately not shipped in the package |
+| `corpora/` | labelled calibration sets: `human`/`ai` (humanities) and `human-tech`/`ai-tech` (maths, CS, science), plus `peer` for genre context. Repo-only, deliberately not shipped in the package |
 | `tests/` | count rules, Binoculars math and segment windows, all self-checking, no model download |
 | `pyproject.toml` | package metadata and dependencies — torch · transformers · python-docx, plus mlx-vlm on Apple Silicon |
 
@@ -170,13 +170,13 @@ separating threshold. Measured across pairs:
 |---|---|---|
 | Qwen2.5-0.5B | 62% | 50% |
 | Qwen2.5-1.5B | 67% | 50% |
-| **Gemma 4 E2B** | **96%** | 50% |
+| **Gemma 4 E2B** | **92%** | 50% |
 
 The Qwen pairs sit near a coin flip: their human and AI score clusters almost
 completely overlap, because the perplexity gap Binoculars exploits is sharp in
 larger models and mush in sub-2B ones. That was the original negative result.
-Swapping in a **Gemma 4** pair opens a clean gap (human mean 0.90 vs AI 0.71)
-and separates the set at 96%. Gemma 4 ships as a multimodal checkpoint, so
+Swapping in a **Gemma 4** pair opens a clean gap (human mean 0.90 vs AI 0.69)
+and separates the set at 92%. Gemma 4 ships as a multimodal checkpoint, so
 `--mlx` quantizes it to 4-bit and runs it text-only through
 [mlx-vlm](https://github.com/Blaizzy/mlx-vlm), fitting the 18GB Mac in ~6GB:
 
@@ -221,6 +221,35 @@ Repeat `--model` to rotate models across topics so the class is not one model's
 quirks, and prefer a family different from the detector's own pair. The output
 manifest records the model, temperature and exact prompt template for every
 sample, so any threshold fitted on it can be audited.
+
+### Genre thresholds: `--tag`
+
+The boundary is not only per model pair, it is **per genre**. Fitted on 12 real
+pre-2013 technical Extended Essay paragraphs (maths, CS, physics, chemistry,
+ITGS), human technical prose means **0.828** where humanities prose means
+**0.901**. The humanities threshold of 0.826 therefore sits almost exactly at the
+*mean* of genuine human technical writing, so a maths or CS essay flags roughly
+half its paragraphs no matter who wrote it.
+
+`--tag` keeps a second calibration beside the first instead of overwriting it:
+
+```bash
+aidetect calibrate --human-dir corpora/human-tech --ai-dir corpora/ai-tech \
+                   --mlx --pair gemma --tag tech      # -> threshold-gemma-mlx-tech.json
+aidetect check "IA Graph Theory.docx" --tag tech      # judged against technical prose
+```
+
+| calibration | threshold | human mean | AI mean | separation |
+|---|---|---|---|---|
+| default (humanities EEs) | 0.826 | 0.901 | 0.692 | 92% |
+| `--tag tech` (maths/CS/science) | 0.753 | 0.828 | 0.650 | 92% |
+
+Both separate 92%, so the genre effect is a **shift in level, not a loss of
+discrimination**: technical prose scores lower for everyone, and once the
+threshold moves with it the detector works just as well. An earlier run measured
+79% here and was wrongly read as "Binoculars is weak on technical prose" — that
+number came from a contaminated AI class, and the story is in
+`corpora/ai-tech/README.md`.
 
 desklib stays the primary detector; Binoculars is now a usable second opinion
 rather than a dead end. The calibration sets are not shipped with the package —

@@ -14,7 +14,8 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from aidetect.generate import (POPULAR_MODELS, PROMPT_TEMPLATE, build_prompt,  # noqa: E402
-                               clean, pick_models, vendor_of)
+                               clean, looks_like_prose, pick_models,
+                               trim_to_words, vendor_of)
 
 
 def test_prompt_carries_topic_and_length_only():
@@ -71,6 +72,27 @@ def test_the_detector_family_is_never_sampled():
     """Generating with Gemma and scoring with the Gemma Binoculars pair would
     flatter the detector: its own family's output is unusually unsurprising."""
     assert not [m for m in POPULAR_MODELS if "gemma" in m.lower()]
+
+
+def test_a_reasoning_trace_is_not_prose():
+    """A real sample from nemotron-3-nano: the model planned out loud instead of
+    writing. Scoring chat scaffolding as 'AI prose' teaches the threshold the
+    wrong thing, so it has to be rejected rather than saved."""
+    leaked = ("We need to write a single paragraph about 110 words, from an IB "
+              "Extended Essay on Wireless in Local Loop. Only the paragraph.")
+    assert looks_like_prose(leaked) is False
+    real = ("Wireless in Local Loop technology has been proposed as a means of "
+            "delivering voice and data services to rural India.")
+    assert looks_like_prose(real) is True
+
+
+def test_trim_keeps_whole_sentences_within_budget():
+    text = "One two three four five. Six seven eight nine ten. Eleven twelve."
+    # stops at the first sentence that reaches the budget, never mid-sentence
+    assert trim_to_words(text, 5) == "One two three four five."
+    assert trim_to_words(text, 8) == "One two three four five. Six seven eight nine ten."
+    # a budget past the end returns everything
+    assert trim_to_words(text, 100) == text
 
 
 def test_no_key_is_an_error_not_a_silent_skip():

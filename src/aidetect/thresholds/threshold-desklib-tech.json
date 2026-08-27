@@ -1,0 +1,6 @@
+{
+  "threshold": 0.5,
+  "amber": 0.5,
+  "n_windows": 13,
+  "human_p90": 0.6744
+}
