@@ -108,6 +108,12 @@ def test_a_reasoning_trace_is_not_prose():
     leaked = ("We need to write a single paragraph about 110 words, from an IB "
               "Extended Essay on Wireless in Local Loop. Only the paragraph.")
     assert looks_like_prose(leaked) is False
+
+    # A real one that reached the corpus before this was tightened: a numbered
+    # planning trace, matching no marker phrase at all.
+    numbered = ("1. **Analyze the Request:** - **Task:** Write a single paragraph "
+                "of about 110 words. - **Source/Context:** Introduction section.")
+    assert looks_like_prose(numbered) is False
     real = ("Wireless in Local Loop technology has been proposed as a means of "
             "delivering voice and data services to rural India.")
     assert looks_like_prose(real) is True

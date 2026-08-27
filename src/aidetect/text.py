@@ -10,8 +10,9 @@ Two layers, deliberately separate:
               on. `count` and `extract` use this and nothing else.
 
   is_prose()  style. What the DETECTOR should not be handed: fragments under 25
-              words, bullet and quote lines, my own note-scaffolding. These are
-              real words the examiner counts, so they never touch `count`.
+              words, bullet and quote lines, list items, table rows, labelled
+              criteria, and my own note-scaffolding. These are real words the
+              examiner counts, so they never touch `count`.
 """
 
 import re
@@ -111,6 +112,44 @@ def walk(path):
         yield (level, title, text)
 
 
+# List items, table rows and labelled criteria. Not prose, even though they are
+# words on a line, and `count` still counts them because the examiner does.
+#
+# This exists because of a measured failure. Segment mode drops the 25-word
+# floor on purpose, so that short connective sentences get scored inside a
+# window instead of being skipped. The side effect was that a CS IA's
+# success-criteria table ("SC12  Highlight the active filter") and its numbered
+# design breakdown ("1.", "2.") were handed to the detector as prose, and
+# between them they drove 16% of that draft into the flagged bucket. That is
+# the detector measuring formatting, not writing.
+#
+# Deliberately NOT here: single-letter items like "a)" and roman numerals like
+# "V.". Both are indistinguishable from an initial at the start of a sentence,
+# and dropping a paragraph that opens "T. S. Eliot wrote..." would be a worse
+# error than keeping a stray list item.
+LIST_MARKERS = re.compile(
+    r"^("
+    r"[•▪◦·*+–—-](\s|$)"     # bullet of some kind
+    r"|\d+[.)](\s|$)"          # 1.  or  1)  or a bare "2." on its own line
+    r"|[A-Z]{1,5}\d+[\s:]"     # labelled criterion: SC12, FR3, NFR10
+    r")"
+)
+
+
+def is_list_item(text):
+    """True for a bullet, a numbered item, a labelled criterion or a table row.
+
+    A tab means columns: python-docx keeps real table cells out of
+    doc.paragraphs, but a table typed as tab-separated text is still a table.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return False
+    if "\t" in stripped:
+        return True
+    return LIST_MARKERS.match(stripped) is not None
+
+
 def is_prose(text, min_words=MIN_WORDS):
     """True if this paragraph is finished prose, not scaffolding.
 
@@ -121,6 +160,8 @@ def is_prose(text, min_words=MIN_WORDS):
     if len(text.split()) < min_words:
         return False
     if text[0] in "•-*“\"[»":               # bullet, quoted snippet, or [SCAFFOLD]/» note marker
+        return False
+    if is_list_item(text):
         return False
     if text.startswith(NOTE_STARTS):
         return False

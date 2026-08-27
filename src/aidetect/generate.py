@@ -255,8 +255,30 @@ META_MARKERS = (
 
 
 def looks_like_prose(text):
-    """False when the model answered with commentary rather than the paragraph."""
-    opening = " ".join(text.split())[:300].lower()
+    """False when the model answered with commentary rather than the paragraph.
+
+    Three ways it can fail, and the first two were found the hard way:
+
+    - a phrase from META_MARKERS, e.g. "we need to write a single paragraph";
+    - **markdown**, which a plain paragraph never contains but a planning trace
+      is full of;
+    - list formatting, caught by the same rule the detector uses. A real sample
+      that got as far as being written to the corpus opened
+      "1. **Analyze the Request:** - **Task:** Write a single paragraph...",
+      which is the model thinking out loud in a numbered list and matches no
+      marker phrase at all.
+
+    A trace saved as an AI sample teaches the threshold that machine writing
+    looks like meeting notes, which is worse than useless.
+    """
+    from .text import is_list_item      # torch-free, so this costs nothing
+
+    flat = " ".join(text.split())
+    if "**" in flat or flat.startswith("#"):
+        return False
+    if is_list_item(flat):
+        return False
+    opening = flat[:300].lower()
     return not any(marker in opening for marker in META_MARKERS)
 
 
