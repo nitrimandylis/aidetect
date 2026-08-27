@@ -122,6 +122,11 @@ RATE_LIMIT_BACKOFF = 20   # seconds, multiplied by the attempt number
 # models that never slip, which is precisely the loss of vendor spread this
 # whole file exists to prevent. Temperature is 1.0, so a retry really is a
 # different roll.
+#
+# This budget is PER SAMPLE, not per model. Counting misses over a model's
+# whole run has the same bug in slow motion: a model that slips one time in
+# five is certain to accumulate three misses somewhere in ninety samples and
+# get dropped anyway. Rolling badly on one topic says nothing about the next.
 BAD_RESPONSE_RETRIES = 3
 
 
@@ -303,7 +308,6 @@ class ModelPool:
         self.lock = threading.Lock()
         self.unavailable = set()
         self.rate_limited = collections.Counter()
-        self.bad_responses = collections.Counter()
         self.vendor_counts = collections.Counter()
 
     def replacement_for(self, model):
@@ -324,11 +328,23 @@ class ModelPool:
             self.rate_limited[model] += 1
             return self.rate_limited[model]
 
-    def note_bad_response(self, model):
-        """Count one unusable answer from this model and return the new total."""
+    def another_than(self, model, already_tried):
+        """A different model for THIS sample, without blacklisting `model`.
+
+        Used when a model keeps returning commentary for one particular topic.
+        The model stays in rotation for every other sample, because the problem
+        was the roll, not the model.
+        """
         with self.lock:
-            self.bad_responses[model] += 1
-            return self.bad_responses[model]
+            skip = set(already_tried) | self.unavailable | {model}
+            candidates = []
+            for candidate in self.pool:
+                if candidate not in skip:
+                    candidates.append(candidate)
+            if not candidates:
+                return None
+            return min(candidates,
+                       key=lambda name: (self.vendor_counts[vendor_of(name)], name))
 
     def note_use(self, model):
         with self.lock:
@@ -363,6 +379,8 @@ def generate_one(entry, model, models_state, api_key, args):
     prompt = build_prompt(entry["topic"], args.words, position)
 
     model = models_state.still_usable(model)
+    tried = []            # models that would not write this particular topic
+    bad_responses = 0     # unusable answers for this sample, reset per model
     text = ""
     while not text:
         if model is None:
@@ -406,13 +424,16 @@ def generate_one(entry, model, models_state, api_key, args):
                 # trace, or a reasoning model that put everything in
                 # reasoning_content. Retry the same model first — this is a bad
                 # roll, not a broken model.
-                attempts = models_state.note_bad_response(model)
-                if attempts <= BAD_RESPONSE_RETRIES:
+                bad_responses += 1
+                if bad_responses <= BAD_RESPONSE_RETRIES:
                     print(f"      {model} returned no prose, retrying "
-                          f"({attempts}/{BAD_RESPONSE_RETRIES})")
+                          f"({bad_responses}/{BAD_RESPONSE_RETRIES})")
                     continue
-                print(f"      {model} returned no prose {attempts} times, dropping it")
-                model = models_state.replacement_for(model)
+                print(f"      {model} keeps returning commentary for this topic, "
+                      f"trying another model")
+                tried.append(model)
+                model = models_state.another_than(model, tried)
+                bad_responses = 0
 
     models_state.note_use(model)
     text = trim_to_words(text, args.words)
