@@ -1,13 +1,13 @@
 ---
 name: aidetect-cli
-description: Drive the aidetect CLI — counts a draft the way the IB counts it (by section, against a word limit) and scores prose offline for how AI-generated it reads. Use whenever the user asks how long a draft is, whether an EE or IA is over its word limit, which section is bloated, whether their writing reads as AI-written, how it would look to Turnitin, or mentions aidetect, Binoculars or the desklib detector.
+description: Drive the aidetect CLI — counts a draft the way the IB counts it (by section, against a word limit) and scores prose offline for how AI-generated it reads. Use whenever the user asks how long a draft is, whether an EE or IA is over its word limit, which section is bloated, whether their writing reads as AI-written, how it would look to Turnitin, or mentions aidetect, Binoculars or the desklib detector. Also covers calibrating the detector on a labelled corpus and generating one.
 ---
 
 # aidetect
 
-One command, five subcommands, all safe to run unattended. Two are instant; the
-three that load a model download gigabytes on their first run. Knowing which is
-which is most of what this skill is for.
+One command, seven subcommands. Three are instant; three load a model and
+download gigabytes on their first run; one calls a paid API over the network.
+Knowing which is which is most of what this skill is for.
 
 ## Setup
 
@@ -28,8 +28,11 @@ PYTHONPATH=src python -m aidetect.cli <subcommand> ...
 | `aidetect count <file.docx> [--limit N] [--json]` | instant, no model | the IB word count, by section and sub-section |
 | `aidetect extract <in.docx> [out.txt]` | instant, no model | writes the counted paragraphs out; defaults to `<name> prose.txt` beside the original |
 | `aidetect score <file>` | **~1.5 GB download on first run**, then seconds | desklib DeBERTa, higher = more AI-ish, flags >= 0.5 |
+| `aidetect score <file> --segments` | as `score` | overlapping 7-sentence windows; reports *% of prose in flagged segments*, the shape Turnitin reports |
 | `aidetect bino <file> --mlx --pair gemma` | **~6 GB download + a local quantization on first run** | Binoculars, **lower** = more AI-ish |
+| `aidetect check <file>` | loads **both** models, so both downloads | the combined verdict, worst opinion per sentence. Prefer this when the user wants one answer |
 | `aidetect calibrate --human-dir D --ai-dir D` | as `bino`, times the sample count | refits a threshold; needs data that does not ship |
+| `aidetect generate --topics M --out-dir D` | **network, and spends API credits** | builds an AI calibration corpus through NVIDIA NIM. Needs `NVIDIA_API_KEY` set by Nick. Never run it unasked |
 
 **Default to `count`.** It answers the question the user usually has, costs
 nothing, and needs no network. Only reach for `score` or `bino` when the user
@@ -66,11 +69,19 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
   a Binoculars score as if high were bad inverts the verdict.
 - **`bino`'s default pair is near-chance and must not be used.** `--pair small`
   separates the calibration set at 62%, `big` at 67%. Only `--mlx --pair gemma`
-  (95.8%) is worth reporting. On this Mac always pass both flags.
-- **`--pair gemma+` (E4B) ships no fitted threshold.** It falls back to the
-  Falcon placeholder of 0.9 and prints no "using calibrated threshold" line, so
-  its flags mean nothing. Only `small`, `big` and the MLX `gemma` pair have
-  thresholds in the package.
+  (92%) is worth reporting. On this Mac always pass both flags.
+- **Score a maths, CS or science draft with `--tag tech`.** Human *technical*
+  prose scores lower on Binoculars than humanities prose for everyone (mean 0.83
+  against 0.90), and the default threshold of 0.826 sits at the technical human
+  mean, so a maths or CS essay flags roughly half its paragraphs no matter who
+  wrote it. `--tag tech` uses the 0.753 threshold fitted on verified technical
+  essays. It moved Nick's maths IA from 28% to 13% and his CS IA from 51% to
+  32%. Without the tag those numbers are noise, so report them with the caveat
+  or not at all. `--tag` works on `check`, `bino` and `score --segments`.
+- **`--pair gemma+` (E4B) is not worth the download.** It was calibrated and tied
+  E2B at 92% while being far larger, and the package ships no E4B threshold, so
+  without a locally fitted one it falls back to the Falcon placeholder of 0.9 and
+  its flags mean nothing. Stay on `--pair gemma`.
 - **`count` and `extract` take a `.docx` only.** Both error on `.txt`, because a
   text file has no styles, and styles are how they find headings and therefore
   sections. `score` and `bino` are the two that accept `.txt`.
@@ -84,15 +95,32 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
 - **A draft with no headings is counted whole**, cover page included, and
   `count` says so in a note under the table. Repeat that note instead of giving
   the total on its own, because nothing was excluded from it.
-- **The scorers skip paragraphs under 25 words**, so a short or bullet-heavy
+- **Paragraph mode skips paragraphs under 25 words**, so a short or bullet-heavy
   draft can legitimately report "no paragraphs found". That is not a failure.
-  `count` has no such floor and counts everything.
+  `count` has no such floor, and neither do `score --segments` or `check`: those
+  slide windows over sentences, so short connective paragraphs are scored inside
+  a window instead of being dropped. That is the whole reason segment mode
+  exists, since formulaic linking sentences are what detectors flag most.
+- **`check`'s two detectors are not equally granular.** desklib scores sentence
+  windows, Binoculars scores whole paragraphs, and the union takes the worse of
+  the two. A sentence can therefore be red because the paragraph around it is
+  red. The printed score is always desklib's.
+- **An empty amber band is a finding, not a bug.** `check` and `score --segments`
+  print a line when over 10% of the human calibration windows land in desklib's
+  red zone, which is currently the case: real human EE prose routinely scores
+  above 0.5 on desklib. Repeat that caveat rather than presenting desklib's red
+  percentage as if it were clean evidence.
 - **`count` strips a parenthetical only if it holds a 4-digit year, `ibid` or
   `et al`.** A citation style using none of those is counted as prose, which
   inflates the total. Say so if the draft's citations look unusual.
 - **`calibrate` has no default data set.** `--human-dir` and `--ai-dir` are
   required, and the corpora deliberately do not ship in the package. From an
   install there is nothing to point them at; it needs a clone of the repo.
+- **Never hand-write a calibration sample.** An AI corpus written by an assistant
+  under house style rules lands stylometrically *inside* the human class, which
+  lowers the threshold and makes the detector more lenient — the false-negative
+  direction the tool exists to prevent. Use `aidetect generate`, which prompts
+  with topic and length only. `corpora/ai-tech/README.md` has the numbers.
 - **A refitted threshold lives in `~/.config/aidetect/` and outranks the one in
   the package.** If Binoculars verdicts look wrong, check for a stale file there
   before suspecting the model.
@@ -117,4 +145,5 @@ framing and offer the intended one.
 - It reads `.docx` and `.txt` only. No `.doc`, no PDF, no Google Docs export.
 - `count` implements the exclusions the EE and the subject IAs share. It does not
   know any subject's actual limit, so `--limit` has to come from the user.
-- It never touches the network after a model is cached.
+- It never touches the network after a model is cached — except `generate`,
+  which is an API client and exists only to build calibration corpora.
