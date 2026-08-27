@@ -332,8 +332,8 @@ groups samples by the digits in their id (`h07a`, `h07b`, `h07c` and their
 matching `a07a`, `a07b`, `a07c` are all essay `07`) and reports two numbers:
 
 ```
-    in-sample separation: 95.5%  <- training fit, always optimistic
-    leave-one-essay-out: 91.7%  over 44 essays  <- report this one
+    in-sample separation: <fit on every sample>   <- always optimistic
+    leave-one-essay-out: <held-out accuracy>  over <n> essays   <- report this one
 ```
 
 The shipped threshold is still fitted on everything; only the accuracy is
