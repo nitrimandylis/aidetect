@@ -1,0 +1,1 @@
+The centre of mass always acts directly down, and the centre of mass when an object is at rest is always in the same place. Having said that, once the centre of mass is in front of the front most contact point of the object, in this particular case the point where the front wheel contacts with the ground the bike will inevitably flip forwards, even at rest.

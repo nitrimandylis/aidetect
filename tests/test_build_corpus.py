@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
 import build_corpus  # noqa: E402
 
-CORPORA = os.path.join(os.path.dirname(__file__), "..", "corpora")
+KNOWN_CLEAN = os.path.join(os.path.dirname(__file__), "fixtures", "known_clean")
 
 DAMAGED = [
     ('visit to a "poor sick family" 4 on a charitable endeavour',
@@ -57,9 +57,10 @@ def test_leaves_clean_prose_alone():
 
 
 def test_noop_on_every_existing_sample():
-    """The 24 samples in corpora/ were hand-picked and carry no OCR damage.
-    Any edit to them means a rule reaches too far."""
-    changed = build_corpus.verify_noop(CORPORA)
+    """The 24 hand-picked samples carry no OCR damage of any kind, so any
+    edit to them means a rule reaches too far. They live in tests/fixtures so
+    this stays true after corpora/ is rebuilt from the pipeline."""
+    changed = build_corpus.verify_noop(KNOWN_CLEAN)
     assert not changed, f"strip rules edited known-clean samples: {changed}"
 
 

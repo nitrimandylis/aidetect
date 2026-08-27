@@ -219,6 +219,27 @@ def document_paragraphs(pages_lines, running):
     return paragraphs
 
 
+def is_heading_line(text, keywords):
+    """True if this line is a real section heading, not a contents entry.
+
+    A contents page lists the same words: `Introduction ....... 3` and
+    `References .......... 20`. Matching those collapsed Psychology_1 to a
+    single paragraph, because the start was set on one contents line and the
+    end on another two lines below it. A real heading is short and carries no
+    page number or dot leader.
+    """
+    stripped = text.strip()
+    if len(stripped.split()) > 5:
+        return False
+    if "..." in stripped or re.search(r"\d\s*$", stripped):
+        return False
+    lowered = stripped.lower()
+    for keyword in keywords:
+        if lowered.startswith(keyword):
+            return True
+    return False
+
+
 def body_slice(paragraphs):
     """Drop the front matter and everything from the bibliography on.
 
@@ -226,20 +247,23 @@ def body_slice(paragraphs):
     student prose but it is a summary, a different register from body prose and
     not what `generate.py` is asked to imitate, so it stays out.
     """
-    start = 0
-    for i, p in enumerate(paragraphs[:40]):
-        if re.match(r"^\s*(?:\d+[.)]?\s*)?introduction\b", p, re.I):
-            start = i + 1
-            break
-    else:
-        start = min(6, len(paragraphs) // 6)     # no heading found: skip front matter by position
+    start = None
+    for index, paragraph in enumerate(paragraphs[:40]):
+        if is_heading_line(paragraph, ["introduction"]):
+            start = index + 1        # keep scanning: the contents page lists it
+    if start is None:                # no heading found, skip front matter by position
+        start = min(6, len(paragraphs) // 6)
 
     end = len(paragraphs)
-    for i in range(start, len(paragraphs)):
-        head = paragraphs[i].strip().lower()[:40]
-        if any(head.startswith(h) for h in END_HEADINGS):
-            end = i
+    for index in range(start, len(paragraphs)):
+        if is_heading_line(paragraphs[index], END_HEADINGS):
+            end = index
             break
+
+    # A body of almost nothing means the slice went wrong, not that the essay
+    # is empty. Better to keep too much and let the damage ranking sort it out.
+    if end - start < 5:
+        return paragraphs[start:]
     return paragraphs[start:end]
 
 
@@ -285,7 +309,7 @@ def pick(paragraphs, per_essay=3):
     return chosen
 
 
-def verify_noop(corpora_root):
+def verify_noop(folder):
     """The strip rules must not touch text already known to be clean.
 
     The 24 existing samples were hand-picked and carry no OCR damage, so any
@@ -294,7 +318,7 @@ def verify_noop(corpora_root):
     """
     import glob
     changed = []
-    for path in sorted(glob.glob(os.path.join(corpora_root, "human*", "*.txt"))):
+    for path in sorted(glob.glob(os.path.join(folder, "*.txt"))):
         original = re.sub(r"\s+", " ", open(path, encoding="utf-8").read()).strip()
         if strip_markers(original) != original:
             changed.append(path)
@@ -309,12 +333,16 @@ def main(argv=None):
     ap.add_argument("--subjects", nargs="*", default=None,
                     help="only essays whose filename starts with one of these")
     ap.add_argument("--per-essay", type=int, default=3)
-    ap.add_argument("--corpora-root", default=os.path.join(os.path.dirname(__file__), "..", "corpora"),
-                    help="checked to prove the strip rules are a no-op on existing samples")
+    ap.add_argument("--known-clean",
+                    default=os.path.join(os.path.dirname(__file__), "..", "tests",
+                                         "fixtures", "known_clean"),
+                    help="samples proven free of OCR damage; the strip rules must not "
+                         "touch them. Kept outside corpora/ so rebuilding the corpus "
+                         "cannot quietly erase this guarantee.")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
 
-    changed = verify_noop(args.corpora_root)
+    changed = verify_noop(args.known_clean)
     if changed:
         raise SystemExit("strip rules edit known-clean samples, they are too greedy:\n  " +
                          "\n  ".join(changed))
