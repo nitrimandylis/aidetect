@@ -11,6 +11,7 @@ import sys
 COMMANDS = {
     "count":     ("aidetect.count",      "IB-rules word count for a draft"),
     "score":     ("aidetect.detect",     "score paragraphs with the desklib detector"),
+    "check":     ("aidetect.check",      "run both detectors, worst opinion wins"),
     "bino":      ("aidetect.binoculars", "second opinion via Binoculars (needs a model pair)"),
     "extract":   ("aidetect.extract",    "pull finished prose out of a .docx into a .txt"),
     "calibrate": ("aidetect.calibrate",  "fit a Binoculars threshold on your own labelled set"),

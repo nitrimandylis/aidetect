@@ -13,11 +13,14 @@ Usage:
 """
 
 import argparse
+import os
 
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, AutoConfig, AutoModel, PreTrainedModel
 
+from .segments import (AMBER_FALLBACK, RED_DEFAULT, build_windows, classify,
+                       document_sentences, print_report, sentence_scores)
 from .text import MIN_WORDS, bar, read_paragraphs
 
 MODEL_ID = "desklib/ai-text-detector-v1.01"
@@ -81,6 +84,56 @@ def score_text(text, tokenizer, model, device):
         return torch.sigmoid(logits).item()
 
 
+def load_desklib_band():
+    """The red/amber boundaries for segment scoring.
+
+    red is the model's own 0.5. amber comes from threshold-desklib.json, which
+    `aidetect calibrate` fits from the human corpus (see fit_desklib_amber);
+    until that has run, a fixed 0.35 stands in. Returns (red, amber, fitted)."""
+    import json
+    from .paths import threshold_path, user_threshold_path
+    for path in (user_threshold_path("desklib"), threshold_path("desklib")):
+        if path and os.path.exists(path):
+            data = json.load(open(path))
+            return (data.get("threshold", RED_DEFAULT),
+                    data.get("amber", AMBER_FALLBACK), True)
+    return RED_DEFAULT, AMBER_FALLBACK, False
+
+
+def score_windows(paragraphs, tokenizer, model, device):
+    """Segment pass: overlapping sentence windows through the model.
+    Returns (sentences, per-sentence worst window scores)."""
+    sentences = document_sentences(paragraphs)
+    windows = build_windows(len(sentences))
+    window_scores = []
+    for start, end in windows:
+        chunk = " ".join(sentence for _number, sentence in sentences[start:end])
+        window_scores.append(score_text(chunk, tokenizer, model, device))
+    return sentences, sentence_scores(len(sentences), windows, window_scores)
+
+
+def band_note(red, amber, fitted):
+    """One line saying where the amber band stands, so its absence in the
+    report reads as a finding, not a bug."""
+    if not fitted:
+        print(f"amber band at fixed {amber} (run `aidetect calibrate` to fit it on your corpus)")
+    elif amber >= red:
+        print("amber band empty: over 10% of your human calibration windows score in "
+              "desklib's red zone, so no edge below red is meaningful")
+
+
+def segment_report(paragraphs, tokenizer, model, device):
+    if not paragraphs:
+        print("No prose found.")
+        return
+    red, amber, fitted = load_desklib_band()
+    band_note(red, amber, fitted)
+    sentences, scores = score_windows(paragraphs, tokenizer, model, device)
+    statuses = [classify(score, red, amber) for score in scores]
+    print_report(sentences, scores, statuses)
+    print("reminder: directional only, not a Turnitin score.")
+
+
 def report(paragraphs, tokenizer, model, device):
     if not paragraphs:
         print("No paragraphs with >= %d words found." % MIN_WORDS)
@@ -105,6 +158,8 @@ def main(argv=None):
                                  description="Local AI-writing detector (desklib).")
     ap.add_argument("path", nargs="?", help=".docx or .txt file to score")
     ap.add_argument("--text", help="score a single string instead of a file")
+    ap.add_argument("--segments", action="store_true",
+                    help="score overlapping sentence windows (Turnitin-shaped) instead of paragraphs")
     args = ap.parse_args(argv)
 
     if not args.path and not args.text:
@@ -114,7 +169,12 @@ def main(argv=None):
     print(f"loading {MODEL_ID} on {device}... (first run downloads ~1.5GB)")
     tokenizer, model = load_model(device)
 
-    if args.text:
+    if args.segments:
+        # min_words=0: short paragraphs are the point of segment mode, they
+        # ride inside windows instead of being skipped as noise
+        paragraphs = [args.text] if args.text else read_paragraphs(args.path, min_words=0)
+        segment_report(paragraphs, tokenizer, model, device)
+    elif args.text:
         prob = score_text(args.text, tokenizer, model, device)
         print(f"AI score: {prob:.2f}  [{bar(prob)}]")
     else:

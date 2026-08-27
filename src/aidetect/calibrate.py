@@ -63,6 +63,53 @@ def pick_threshold(human_scores, ai_scores):
     return cutoff, acc
 
 
+def fit_desklib_amber(human_dir):
+    """Fit the amber edge for `aidetect score --segments` on the human corpus.
+
+    Scores every sentence window of every human .txt with desklib and takes the
+    90th percentile: 9 in 10 provably-human windows score below this edge. Not
+    the maximum, because one weird human paragraph would push the edge up
+    against the red 0.5 line and erase the band."""
+    import json
+
+    from .detect import load_model, pick_device
+    from .detect import score_text as desklib_score
+    from .segments import RED_DEFAULT, build_windows, document_sentences
+    from .text import is_prose
+
+    print("\nfitting the desklib amber band on the same human corpus...")
+    device = pick_device()
+    tokenizer, model = load_model(device)
+
+    window_scores = []
+    for path in sorted(glob.glob(os.path.join(human_dir, "*.txt"))):
+        text = open(path, encoding="utf-8").read()
+        # min_words=0: segment mode scores short paragraphs too, so the edge
+        # has to be fitted on the same kind of windows it will judge
+        paragraphs = [c.strip() for c in text.split("\n\n") if is_prose(c, min_words=0)]
+        sentences = document_sentences(paragraphs)
+        for start, end in build_windows(len(sentences)):
+            chunk = " ".join(sentence for _number, sentence in sentences[start:end])
+            window_scores.append(desklib_score(chunk, tokenizer, model, device))
+
+    window_scores.sort()
+    p90 = window_scores[int(0.9 * (len(window_scores) - 1))]
+    # never past red: if humans routinely score above 0.5 the band is empty,
+    # which is the honest answer, not a wider band
+    amber = round(min(p90, RED_DEFAULT), 4)
+    out = {
+        "threshold": RED_DEFAULT,
+        "amber": amber,
+        "n_windows": len(window_scores),
+        "human_p90": round(p90, 4),
+    }
+    ensure_user_dir()
+    path = user_threshold_path("desklib")
+    json.dump(out, open(path, "w"), indent=2)
+    print(f"    desklib amber edge: {amber}  ({len(window_scores)} human windows)")
+    print(f"    saved -> {path}")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="aidetect calibrate",
@@ -100,12 +147,21 @@ def main(argv=None):
     print(f"\n>>> calibrated threshold: {cutoff:.3f}  (separates {acc*100:.0f}% of the {len(human)+len(ai)} samples)")
     print("    flag as AI-ish when score < threshold")
 
+    # The amber edge: the worst (lowest) human doc that still passed. Between
+    # the cutoff and this score, no provably-human essay ever landed, so a
+    # draft scoring there is borderline even though it is not flagged.
+    passing_human = [s for s in human_scores if s >= cutoff]
+    amber = round(min(passing_human), 4) if passing_human else None
+    if amber is not None:
+        print(f"    borderline (amber) below {amber}: no human calibration doc scored lower and passed")
+
     # save for reuse / future recalibration
     active_pairs = MLX_PAIRS if backend == "mlx" else PAIRS
     out = {
         "pair": active_pairs[pair_key],
         "backend": backend,
         "threshold": round(cutoff, 4),
+        "amber": amber,
         "accuracy": round(acc, 4),
         "n_human": len(human),
         "n_ai": len(ai),
@@ -117,7 +173,13 @@ def main(argv=None):
     json.dump(out, open(thr_path, "w"), indent=2)
     print(f"    saved -> {thr_path}")
 
+    # --- fit the desklib amber band on the same human folder ---
+    # Runs every calibration: it is idempotent, and calibrate is the only
+    # command that ever sees the human corpus.
+    fit_desklib_amber(args.human_dir)
+
     # --- run the calibrated check on a draft ---
     if args.check:
         print(f"\n=== checking {args.check} with threshold {cutoff:.3f} ===")
-        report(read_paragraphs(args.check), cutoff, tokenizer, observer, performer, device, backend)
+        report(read_paragraphs(args.check), cutoff, tokenizer, observer, performer, device, backend,
+               amber=amber)

@@ -68,18 +68,22 @@ def pair_tag(pair_key, backend):
     return f"{pair_key}-mlx" if backend == "mlx" else pair_key
 
 
-def load_saved_threshold(pair_key, backend):
-    """Return the saved threshold for this pair, or None if never calibrated.
+def load_saved(pair_key, backend):
+    """Return the saved calibration dict for this pair, or {} if never
+    calibrated. Holds "threshold" and, on newer files, "amber" (the score of
+    the worst human calibration doc that still passed: anything between the
+    threshold and it is borderline, because no provably-human essay scored
+    that low).
 
-    A threshold you fitted yourself (~/.config/aidetect) wins over the one
-    shipped in the wheel, so recalibrating survives an upgrade.
+    A file you fitted yourself (~/.config/aidetect) wins over the one shipped
+    in the wheel, so recalibrating survives an upgrade.
     """
     import json
     tag = pair_tag(pair_key, backend)
     for path in (user_threshold_path(tag), threshold_path(tag)):
         if path and os.path.exists(path):
-            return json.load(open(path)).get("threshold")
-    return None
+            return json.load(open(path))
+    return {}
 
 
 def load_pair(pair_key, device):
@@ -190,7 +194,8 @@ def score_text(text, tokenizer, observer, performer, device, backend="torch"):
     return ppl / x_ppl
 
 
-def report(paragraphs, threshold, tokenizer, observer, performer, device, backend="torch"):
+def report(paragraphs, threshold, tokenizer, observer, performer, device, backend="torch",
+           amber=None):
     if not paragraphs:
         print("No paragraphs with >= %d words found." % MIN_WORDS)
         return
@@ -198,7 +203,13 @@ def report(paragraphs, threshold, tokenizer, observer, performer, device, backen
     for i, para in enumerate(paragraphs, 1):
         s = score_text(para, tokenizer, observer, performer, device, backend)
         scores.append(s)
-        flag = "  <-- AI-ish" if s < threshold else ""
+        # lower = more AI. Below the threshold is a flag; between the threshold
+        # and the amber edge no provably-human calibration doc ever scored.
+        flag = ""
+        if s < threshold:
+            flag = "  <-- AI-ish"
+        elif amber is not None and s < amber:
+            flag = "  <-- borderline"
         # bar: lower score = more AI, so invert for a "how AI-ish" bar
         aiish = max(0.0, min(1.0, (threshold * 1.3 - s) / (threshold * 1.3)))
         print(f"P{i:>3}  {s:5.2f}  [{bar(aiish)}]{flag}")
@@ -227,9 +238,11 @@ def main(argv=None):
     pair_key, backend, device, tokenizer, observer, performer = load_backend(args)
 
     # explicit --threshold wins; else use the calibrated one; else Falcon's placeholder
+    saved = load_saved(pair_key, backend)
     threshold = args.threshold
+    amber = saved.get("amber")
     if threshold is None:
-        threshold = load_saved_threshold(pair_key, backend)
+        threshold = saved.get("threshold")
         if threshold is not None:
             print(f"using calibrated threshold {threshold}")
     if threshold is None:
@@ -240,4 +253,5 @@ def main(argv=None):
         verdict = "AI-ish" if s < threshold else "human-ish"
         print(f"Binoculars score: {s:.2f}  ({verdict}, threshold {threshold})")
     else:
-        report(read_paragraphs(args.path), threshold, tokenizer, observer, performer, device, backend)
+        report(read_paragraphs(args.path), threshold, tokenizer, observer, performer, device, backend,
+               amber=amber)

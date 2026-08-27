@@ -60,6 +60,8 @@ reminder: directional only, not a Turnitin score.
 | 05 | **second opinion** | cross-check against the lighter [Ejhfast/fast-ai-detector] when one model's paranoia isn't enough |
 | 06 | **Binoculars (Gemma 4)** | a training-free perplexity-ratio detector — near chance with small Qwen pairs, but 96% on the labelled set once swapped to a Gemma 4 pair; see below |
 | 07 | **IB word count** | `aidetect count` (`--json` for scripts and agents) counts what the IB counts — no cover page, contents, headings, captions, tables, footnotes, citations or bibliography — and splits the total by section and sub-section, so an over-long draft tells you *where* |
+| 08 | **Turnitin-shaped segments** | `score --segments` slides overlapping 7-sentence windows across the prose — short connective paragraphs included, the ones paragraph mode skips — and reports *% of prose in flagged segments*, the same shape as Turnitin's headline number |
+| 09 | **combined verdict** | `aidetect check` runs the desklib segments and Binoculars over the same draft and takes the worst opinion per sentence — disagreement between detectors surfaces instead of averaging away |
 
 ## 🚀 Run it
 
@@ -68,13 +70,15 @@ uv tool install aidetect      # or: pipx install aidetect
 ```
 
 ```bash
-aidetect                                   # list the five subcommands
+aidetect                                   # list the six subcommands
 aidetect count "draft.docx" --limit 4000   # IB word count, by section
 aidetect count "draft.docx" --json         # same, as one JSON object
 aidetect extract "draft.docx"              # -> "draft prose.txt", what got counted
-aidetect score "draft.docx"                # score a whole draft
+aidetect score "draft.docx"                # score a whole draft, paragraph by paragraph
+aidetect score "draft.docx" --segments     # Turnitin-shaped: % of prose in flagged windows
 aidetect score --text "one sentence"       # score a single string
 aidetect bino  "draft.docx" --mlx --pair gemma
+aidetect check "draft.docx"                # both detectors, worst opinion wins
 ```
 
 `count` and `extract` are instant and need no model. `score` and `bino` need a
@@ -138,13 +142,15 @@ the detector, which is the whole reason the split exists.
 | `src/aidetect/text.py` | shared, torch-free: `walk()` reads a `.docx`'s structure once, `is_prose()` is the detector's separate style filter |
 | `src/aidetect/count.py` | the IB word count — sections, rollup, citation stripping, budget |
 | `src/aidetect/detect.py` | loads the desklib model, scores each paragraph, prints the bars and flags |
+| `src/aidetect/segments.py` | torch-free window arithmetic for `--segments` and `check`: sentence split, overlapping windows, worst-window scores, red/amber/clean |
+| `src/aidetect/check.py` | runs both detectors over one draft and unions the verdicts — worst opinion wins, no ensemble weights |
 | `src/aidetect/extract.py` | dumps a `.docx`'s countable prose into a `.txt`, the same words `count` counts |
 | `src/aidetect/binoculars.py` | training-free perplexity-ratio scorer over a base+instruct LM pair (Qwen, or Gemma 4 via `--mlx`; see below) |
 | `src/aidetect/calibrate.py` | fits a threshold on a labelled set you supply, saves it to `~/.config/aidetect` |
 | `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package |
 | `src/aidetect/thresholds/` | the thresholds shipped with the package; a threshold you fit yourself wins over these |
 | `corpora/` | my labelled calibration sets. Repo-only, deliberately not shipped in the package |
-| `tests/` | count rules and Binoculars math, both self-checking, no model download |
+| `tests/` | count rules, Binoculars math and segment windows, all self-checking, no model download |
 | `pyproject.toml` | package metadata and dependencies — torch · transformers · python-docx, plus mlx-vlm on Apple Silicon |
 
 ## 🔭 Binoculars: shelved, then revived by Gemma 4
