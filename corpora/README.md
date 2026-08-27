@@ -1,0 +1,87 @@
+# corpora/
+
+The labelled set `aidetect calibrate` fits a threshold on. Not shipped in the
+wheel or the sdist (`pyproject.toml` excludes it), and not covered by this
+repository's MIT licence. See **Licensing** below.
+
+## What is in here
+
+| folder | what | n |
+|---|---|---|
+| `human/` | body paragraphs from pre-2020 IB Extended Essays, humanities and social sciences | 3 per essay |
+| `human-tech/` | the same, from maths, sciences, ITGS and computer science | 3 per essay |
+| `ai/`, `ai-tech/` | one clean-room LLM paragraph per human paragraph, on the same topic and from the same position in the essay | matched 1:1 |
+| `peer/` | IB Computer Science IA paragraphs, for comparison only | 6 |
+
+Every folder has a `manifest.json`. Human entries record `source_url`,
+`date_evidence`, `extraction`, `source_essay`, `position`, and a `sha256` of the
+file. AI entries record the model, vendor, temperature, seed and the exact
+prompt template used.
+
+## Where the human text comes from
+
+Almost all of it is the IBO collection *50 Excellent Extended Essays*, retrieved
+through the Wayback Machine. Every PDF carries
+`© International Baccalaureate Organization 2008` on every page and a 2008
+`CreationDate` in its metadata, and every capture predates 2020. A handful of
+samples come from other pre-2020 exemplars, each with its own `date_evidence`.
+
+**The provenance is the point.** A threshold is only meaningful if the human
+class is provably human, so nothing written after ChatGPT goes in it unless it
+can be certified. That is also why `peer/` is quarantined: every sample in it
+postdates ChatGPT and none can be certified, so fitting on it would let
+AI-assisted text drag the human mean down. If peer samples are ever scored they
+are reported as a separate comparison row and never merged into `human`.
+
+## How the paragraphs were extracted
+
+The IBO PDFs are page images. `pdftotext` returns the running header and nothing
+else, so `tools/build_corpus.py` renders each page at 200 dpi, OCRs it with
+macOS Vision, and rebuilds paragraphs from line geometry. Footnote superscripts
+fuse to the preceding word when OCR'd (`walnuts"|8`), and those are stripped by
+rules that `tests/test_build_corpus.py` proves are a byte-level no-op on every
+sample that was hand-picked before the pipeline existed.
+
+**No model ever rewrites this text.** The pipeline selects and it strips one
+documented artifact; it does not edit prose. Letting an LLM tidy OCR damage
+would put model-shaped writing into the human class, which is the same
+contamination `generate.py` refuses for the AI class, mirrored and worse.
+
+Three paragraphs per essay, one from each third of the body, because:
+
+- the desklib amber band is the 90th percentile of human window scores, and a
+  dozen windows cannot support a percentile;
+- three paragraphs carry the register spread a real essay has, which is why
+  `generate.py` is given the same three positions;
+- roughly 8% of a 4000-word essay is a defensible excerpt and more is not, so
+  three is a ceiling rather than a starting point.
+
+Paragraphs from one essay share an author and are **not** independent
+observations. `calibrate` groups them by essay and reports leave-one-essay-out
+accuracy for that reason. `n_essays` in each threshold file is the real sample
+size; `n_human` is not.
+
+## Verifying a sample
+
+Each human manifest entry carries the SHA-256 of its file, so the corpus can be
+checked without anyone having to hand over the text:
+
+    python3 -c "import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],'rb').read().strip().decode().encode()).hexdigest())" human/h07a.txt
+
+## Licensing
+
+The repository is MIT. **This directory is not.**
+
+`human/` and `human-tech/` are short excerpts from Extended Essays written by
+other students and published by the IB Organization. Copyright rests with those
+authors and the IBO. They appear here as brief excerpts, roughly one paragraph
+in twelve of each essay, used non-commercially to calibrate a detector, with no
+substitution for the originals, which remain freely available at the
+`source_url` in each manifest entry.
+
+Nothing in this directory is offered under the MIT licence, and the MIT grant in
+`LICENSE` does not extend to it. If you are the author of one of these essays
+and want an excerpt removed, open an issue.
+
+`ai/` and `ai-tech/` are model output generated for this repository and carry no
+such restriction.
