@@ -372,7 +372,11 @@ def generate_one(entry, model, models_state, api_key, args):
     prompt = build_prompt(entry["topic"], args.words, position)
 
     model = models_state.still_usable(model)
-    tried = []            # models that would not write this particular topic
+    # Models that would not serve this particular sample, whether because they
+    # kept answering with commentary or because they were busy. Note this means
+    # a sample can end up on a different model than --seed assigned; the
+    # manifest records the model actually used, so the set stays auditable.
+    tried = []
     bad_responses = 0     # unusable answers for this sample, reset per model
     rate_limit_waits = 0  # 429s seen while working on this sample
     timeouts = 0          # consecutive timeouts from the current model
@@ -389,22 +393,26 @@ def generate_one(entry, model, models_state, api_key, args):
             if error.code in (401, 403) and "account" not in detail:
                 raise SystemExit(f"NIM rejected the API key ({error.code}): {detail}")
             if error.code == 429:
-                # Transient and nothing to do with this model: the account has
-                # a request-rate cap and we are hitting it. Counted per sample,
-                # because a lifetime counter would retire every model after a
-                # few busy minutes for a reason that is not its fault.
-                rate_limit_waits += 1
-                if rate_limit_waits > RATE_LIMIT_RETRIES:
-                    # let the whole account recover rather than blaming a model
-                    # that is answering perfectly well
-                    print(f"      429 for {model} again, backing off "
-                          f"{RATE_LIMIT_BACKOFF * 4}s")
-                    time.sleep(RATE_LIMIT_BACKOFF * 4)
-                    rate_limit_waits = 0
+                # build.nvidia.com is not credit-based. It rate limits by how
+                # busy THAT model is right now ("dependent on model, use-case
+                # and the amount of current overall traffic using the same
+                # access"), so a 429 says the model is popular this minute, not
+                # that the account is out of anything. Measured: two models can
+                # 429 while four others answer 200 in the same second.
+                #
+                # So the cheap fix is another model, not a sleep. Only when
+                # every model is busy is there anything to wait for.
+                alternative = models_state.another_than(model, tried)
+                if alternative is not None:
+                    print(f"      429 for {model} (busy), switching model")
+                    tried.append(model)
+                    model = alternative
                     continue
+                rate_limit_waits += 1
                 wait = RATE_LIMIT_BACKOFF * rate_limit_waits
-                print(f"      429 for {model}, waiting {wait}s and retrying")
+                print(f"      429 from every model, waiting {wait}s")
                 time.sleep(wait)
+                tried = []          # let them all back in after the wait
                 continue
             print(f"      {error.code} for {model}, dropping it: {detail[:90]}")
             model = models_state.replacement_for(model)
