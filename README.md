@@ -244,6 +244,10 @@ aidetect check "IA Graph Theory.docx" --tag tech      # judged against technical
 | default (humanities EEs) | 0.826 | 0.901 | 0.692 | 92% |
 | `--tag tech` (maths/CS/science) | 0.753 | 0.828 | 0.650 | 92% |
 
+Measured on four of my own drafts, moving to the technical threshold cut the
+flag rate on the maths IA from 28% to 13% and the CS IA from 51% to 32%, while
+the two humanities drafts (3% and 13%) did not move at all.
+
 Both separate 92%, so the genre effect is a **shift in level, not a loss of
 discrimination**: technical prose scores lower for everyone, and once the
 threshold moves with it the detector works just as well. An earlier run measured
@@ -273,11 +277,17 @@ IBO-published new-syllabus specimens). Measured against the same anchors:
 | set | Binoculars mean | desklib mean |
 |---|---|---|
 | human (2008 EEs, verified pre-2020) | **0.90** | n/a |
+| **human-tech (2008–2013 maths/CS/science EEs, verified)** | **0.83** | n/a |
 | **peer (CS IAs, 2021–2025)** | **0.85** | **0.46** |
-| ai (LLM-written, matched topics) | **0.71** | n/a |
+| ai (LLM-written, matched topics) | **0.69** | n/a |
 
-The genre gap is real and it is about 0.05 on Binoculars. Score your IA against
-`peer`, not against `human`.
+The genre gap is real and it is about **0.07** on Binoculars, measured against
+`human-tech` — twelve technical EE paragraphs that are provably pre-AI, which is
+the anchor `peer` could only approximate. `peer` sitting at 0.85, between the two
+verified human classes, is consistent with that gap rather than evidence of
+anything about the students who wrote it.
+
+Score a technical draft with `--tag tech`, which encodes exactly this shift.
 
 **It is not a human class and it never fits a threshold.** Every source
 postdates ChatGPT; three of the five were written in 2025. None carries an
