@@ -17,7 +17,6 @@
 | `human/` | body paragraphs from pre-2020 IB Extended Essays, humanities and social sciences | 3 per essay |
 | `human-tech/` | the same, from maths, sciences, ITGS and computer science | 3 per essay |
 | `ai/`, `ai-tech/` | one clean-room LLM paragraph per human paragraph, on the same topic and from the same position in the essay | matched 1:1 |
-| `peer/` | IB Computer Science IA paragraphs, for comparison only | 6 |
 
 Every folder has a `manifest.json`. Human entries record `source_url`,
 `date_evidence`, `extraction`, `source_essay`, `position`, and a `sha256` of the
@@ -34,10 +33,14 @@ samples come from other pre-2020 exemplars, each with its own `date_evidence`.
 
 **The provenance is the point.** A threshold is only meaningful if the human
 class is provably human, so nothing written after ChatGPT goes in it unless it
-can be certified. That is also why `peer/` is quarantined: every sample in it
-postdates ChatGPT and none can be certified, so fitting on it would let
-AI-assisted text drag the human mean down. If peer samples are ever scored they
-are reported as a separate comparison row and never merged into `human`.
+can be certified.
+
+A `peer/` folder of IB Computer Science IA paragraphs used to sit here for genre
+comparison. It was deleted: nine of its twelve samples were unattributed student
+coursework with `provenance: "unverified"` and no source URL, which is exactly
+the claim the rest of this file cannot make good on. The genre question it
+existed to answer is answered better by `human-tech`, which is certified and has
+its own fitted threshold.
 
 ## Rebuilding the human corpora from scratch
 

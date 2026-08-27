@@ -178,7 +178,7 @@ together and takes the worse verdict per sentence.
 | `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package |
 | `src/aidetect/thresholds/` | the thresholds shipped with the package; a threshold you fit yourself wins over these |
 | `pyproject.toml` sdist excludes | `corpora`, `tests`, `tools` — `tests/fixtures/` holds the same essay excerpts as `corpora/`, so shipping the tests would redistribute what `corpora/` is withheld to protect |
-| `corpora/` | labelled calibration sets: `human`/`ai` (humanities) and `human-tech`/`ai-tech` (maths, CS, science), plus `peer` for genre context. Repo-only, deliberately not shipped in the package, and **not covered by this repo's MIT licence** — see `corpora/README.md` |
+| `corpora/` | labelled calibration sets: `human`/`ai` (humanities) and `human-tech`/`ai-tech` (maths, science, ITGS). Repo-only, deliberately not shipped in the package, and **not covered by this repo's MIT licence** — see `corpora/README.md` |
 | `tools/fetch_exemplars.sh` | downloads the 48 IBO exemplars from the Wayback Machine |
 | `tools/ocr.swift` | macOS Vision OCR for one page image; prints text plus line geometry as TSV. Compiled on demand by `run_ocr.sh`, never committed |
 | `tools/run_ocr.sh`, `tools/ocr_all.sh` | render a scan to 200 dpi pages and OCR it, one essay or a whole folder |
@@ -402,49 +402,28 @@ unhelpful direction: a human class shifted down drags the cutoff down with it,
 and a lower cutoff is a more lenient detector. Seventeen pairs from two essays
 supports a direction, not a precise effect size.
 
-## 🧪 The peer set: genre context, not a human class
+## 🧪 Technical prose scores lower, whoever wrote it
 
-The human samples are Extended Essays across ten humanities and social science
-subjects, with maths, sciences and ITGS in `human-tech`. Neither contains a
-computer science essay: the three that used to sit in `human-tech` came from
-sources outside the IBO collection and did not survive the rebuild, so ITGS is
-the closest certified-human genre. A CS IA is a different animal, all database schemas, GUI components and
-method-by-method justification, and technical prose is inherently more
-predictable token-by-token, which drags perplexity-ratio scores down no matter
-who typed it. So a CS IA scoring below the EE human mean means less than it
-looks.
+Technical writing is more predictable token by token — database schemas, GUI
+components, method-by-method justification — and that drags perplexity-ratio
+scores down regardless of authorship. So a CS or maths draft scoring below the
+humanities human mean means less than it looks.
 
-`corpora/peer/` holds 12 paragraphs of real IB Computer Science IA prose
-(5 projects, 5 authors: sudokuMaster, IBOrganizer, MyCalendar, and two
-IBO-published new-syllabus specimens). Measured against the same anchors:
+The gap between the two verified human classes measures it:
 
-| set | Binoculars mean | desklib mean |
-|---|---|---|
-| human (2008 EEs, verified pre-2020) | **0.90** | n/a |
-| **human-tech (2008–2013 maths/CS/science EEs, verified)** | **0.83** | n/a |
-| **peer (CS IAs, 2021–2025)** | **0.85** | **0.46** |
-| ai (LLM-written, matched topics) | **0.69** | n/a |
+| set | Binoculars mean |
+|---|---|
+| `human` (2008 humanities EEs, verified pre-2020) | **0.90** |
+| `human-tech` (2008–2013 maths/science/ITGS EEs, verified) | **0.83** |
+| `ai` (LLM-written, matched topics) | **0.69** |
 
-The genre gap is real and it is about **0.07** on Binoculars, measured against
-`human-tech` — twelve technical EE paragraphs that are provably pre-AI, which is
-the anchor `peer` could only approximate. `peer` sitting at 0.85, between the two
-verified human classes, is consistent with that gap rather than evidence of
-anything about the students who wrote it.
+About **0.07** of the apparent signal on a technical draft is genre, not
+authorship. Score technical work with `--tag tech`, which encodes exactly that
+shift, rather than reading the humanities threshold and worrying.
 
-Score a technical draft with `--tag tech`, which encodes exactly this shift.
-
-**It is not a human class and it never fits a threshold.** Every source
-postdates ChatGPT; three of the five were written in 2025. None carries an
-authorship attestation, and in 2025 a fair share of student IAs were not
-written unaided. Fold that into `human/` and any AI-assisted sample drags the
-mean down, lowers the threshold, and the tool starts clearing drafts for the
-wrong reason, a detector that reassures instead of measures. `aidetect calibrate`
-reads only the two folders you name, so `peer/` stays out of threshold fitting
-by construction, not by discipline.
-
-What it can tell you: *"my prose scores like other IAs in this genre."* What it
-can never tell you: *"my prose is human."* Matching a set you cannot vouch for
-proves you are not an outlier, nothing more.
+Neither corpus currently contains a computer science essay. The three that used
+to sit in `human-tech` came from sources outside the IBO collection and did not
+survive the rebuild, so ITGS is the nearest certified-human genre for a CS IA.
 
 **Stack:** python · pytorch · transformers · mlx-vlm · desklib DeBERTa
 

@@ -70,7 +70,7 @@ that need no model stay instant.
   refit lands in `~/.config/aidetect` and wins. Calibration output never writes
   into site-packages, which is replaced on upgrade.
 - **`corpora/` does not ship.** Four labelled sets (`human`/`ai` humanities,
-  `human-tech`/`ai-tech` maths, CS and science) plus `peer` for genre context,
+  `human-tech`/`ai-tech` maths, science and ITGS),
   built from other people's Extended Essays and matched LLM writing. Fine in a
   repo, not something to push through PyPI on every install. `calibrate`
   therefore requires explicit folder arguments.
