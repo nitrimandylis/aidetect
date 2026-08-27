@@ -293,6 +293,10 @@ def main(argv=None):
                     help="seed the model sampling so a corpus can be regenerated")
     ap.add_argument("--words", type=int, default=110,
                     help="target words per paragraph (default %(default)s)")
+    ap.add_argument("--timeout", type=int, default=180,
+                    help="seconds to wait for one completion (default %(default)s). "
+                         "Measured: a large hosted model can legitimately take ~120s, "
+                         "so a tighter limit drops working models as if they were dead.")
     args = ap.parse_args(argv)
 
     api_key = os.environ.get("NVIDIA_API_KEY")
@@ -361,7 +365,7 @@ def main(argv=None):
         while not text:
             print(f"{out_id}  {model}  {entry['topic'][:50]}...")
             try:
-                text = clean(call_nim(prompt, model, api_key))
+                text = clean(call_nim(prompt, model, api_key, args.timeout))
             except urllib.error.HTTPError as error:
                 detail = error.read().decode("utf-8", "replace")[:200]
                 if error.code in (401, 403) and "account" not in detail:
