@@ -22,6 +22,7 @@ import argparse
 import glob
 import json
 import os
+import re
 
 from .binoculars import (MLX_PAIRS, PAIRS, add_backend_args, load_backend,
                          pair_tag, report, score_text)
@@ -63,6 +64,96 @@ def pick_threshold(human_scores, ai_scores):
     return cutoff, acc
 
 
+def group_of(sample_id):
+    """Which essay a sample came from: the digits in its id.
+
+    Three paragraphs of one essay are h07a, h07b, h07c and share group "07";
+    their AI counterparts are a07a, a07b, a07c and share it too. Older
+    single-paragraph sets (h01..h12) fall out as one group each, so nothing
+    about them changes.
+
+    Paragraphs by one author are not independent observations. Scoring them as
+    if they were would let a cutoff that happens to fit one essay be credited
+    three times, and report a confidence the set does not contain.
+    """
+    digits = re.search(r"\d+", sample_id)
+    return digits.group() if digits else sample_id
+
+
+def leave_one_essay_out(human, ai):
+    """Honest accuracy: refit the cutoff with one essay held out, predict it.
+
+    The number `pick_threshold` returns is training accuracy. It picks the
+    cutoff that best separates the samples it can see, then reports how well
+    that cutoff separates those same samples, which is close to guaranteed to
+    flatter. This holds out an essay's human paragraphs AND its matched AI
+    samples together: leaving the AI half in would leak the essay's topic into
+    the training set.
+
+    Cheap, because scoring already happened. This refits over cached floats.
+    """
+    essays = set()
+    for sample_id, _score in human + ai:
+        essays.add(group_of(sample_id))
+    essays = sorted(essays)
+
+    correct = 0
+    predicted = 0
+    for held_out in essays:
+        training_human = []
+        testing_human = []
+        for sample_id, score in human:
+            if group_of(sample_id) == held_out:
+                testing_human.append(score)
+            else:
+                training_human.append(score)
+
+        training_ai = []
+        testing_ai = []
+        for sample_id, score in ai:
+            if group_of(sample_id) == held_out:
+                testing_ai.append(score)
+            else:
+                training_ai.append(score)
+
+        if not training_human or not training_ai:
+            continue
+        if not testing_human and not testing_ai:
+            continue
+
+        cutoff, _accuracy = pick_threshold(training_human, training_ai)
+        for score in testing_human:
+            if score >= cutoff:
+                correct += 1
+        for score in testing_ai:
+            if score < cutoff:
+                correct += 1
+        predicted += len(testing_human) + len(testing_ai)
+
+    if predicted == 0:
+        return None, len(essays)
+    return correct / predicted, len(essays)
+
+
+def percentile(values, fraction):
+    """Nearest-rank percentile of a sorted copy. Same convention as
+    fit_desklib_amber, which has used it since the band was first fitted."""
+    ordered = sorted(values)
+    return ordered[int(fraction * (len(ordered) - 1))]
+
+
+def essays_in(folder):
+    """The distinct essays a folder of samples came from.
+
+    Three paragraph files of one essay count once. The window count alone would
+    otherwise overstate how much independent evidence the band rests on.
+    """
+    essays = set()
+    for path in glob.glob(os.path.join(folder, "*.txt")):
+        essays.add(group_of(os.path.basename(path)))
+    return essays
+
+
 def fit_desklib_amber(human_dir, tag=None):
     """Fit the amber edge for `aidetect score --segments` on the human corpus.
 
@@ -101,6 +192,7 @@ def fit_desklib_amber(human_dir, tag=None):
         "threshold": RED_DEFAULT,
         "amber": amber,
         "n_windows": len(window_scores),
+        "n_essays": len(essays_in(human_dir),),
         "human_p90": round(p90, 4),
     }
     ensure_user_dir()
@@ -144,14 +236,24 @@ def main(argv=None):
     print(f"ai   : min {min(ai_scores):.3f}  mean {sum(ai_scores)/len(ai_scores):.3f}  max {max(ai_scores):.3f}")
 
     cutoff, acc = pick_threshold(human_scores, ai_scores)
-    print(f"\n>>> calibrated threshold: {cutoff:.3f}  (separates {acc*100:.0f}% of the {len(human)+len(ai)} samples)")
+    loo_acc, n_essays = leave_one_essay_out(human, ai)
+    print(f"\n>>> calibrated threshold: {cutoff:.3f}  (fitted on all {len(human)+len(ai)} samples)")
     print("    flag as AI-ish when score < threshold")
+    print(f"    in-sample separation: {acc*100:.1f}%  <- training fit, always optimistic")
+    if loo_acc is not None:
+        print(f"    leave-one-essay-out: {loo_acc*100:.1f}%  over {n_essays} essays  <- report this one")
 
-    # The amber edge: the worst (lowest) human doc that still passed. Between
-    # the cutoff and this score, no provably-human essay ever landed, so a
-    # draft scoring there is borderline even though it is not flagged.
+    # The amber edge: the low tail of the human samples that still passed.
+    # A draft scoring between here and the cutoff is borderline but not flagged.
+    #
+    # This is the 10th percentile, not the minimum. A minimum only ever moves
+    # down as more samples are drawn, so with a growing corpus the band would
+    # widen every recalibration without anything having been learned, and one
+    # odd author would drag it with all three of their paragraphs.
+    # fit_desklib_amber already takes p90 for exactly this reason; this is the
+    # same rule at the other end of the scale.
     passing_human = [s for s in human_scores if s >= cutoff]
-    amber = round(min(passing_human), 4) if passing_human else None
+    amber = round(percentile(passing_human, 0.10), 4) if passing_human else None
     if amber is not None:
         print(f"    borderline (amber) below {amber}: no human calibration doc scored lower and passed")
 
@@ -162,9 +264,12 @@ def main(argv=None):
         "backend": backend,
         "threshold": round(cutoff, 4),
         "amber": amber,
-        "accuracy": round(acc, 4),
+        "accuracy": round(loo_acc, 4) if loo_acc is not None else None,
+        "accuracy_kind": "leave-one-essay-out",
+        "accuracy_in_sample": round(acc, 4),
         "n_human": len(human),
         "n_ai": len(ai),
+        "n_essays": n_essays,
         "human_mean": round(sum(human_scores)/len(human_scores), 4),
         "ai_mean": round(sum(ai_scores)/len(ai_scores), 4),
     }
