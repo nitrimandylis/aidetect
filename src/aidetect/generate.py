@@ -307,7 +307,6 @@ class ModelPool:
         self.pool = pool
         self.lock = threading.Lock()
         self.unavailable = set()
-        self.rate_limited = collections.Counter()
         self.vendor_counts = collections.Counter()
 
     def replacement_for(self, model):
@@ -321,12 +320,6 @@ class ModelPool:
             if model not in self.unavailable:
                 return model
             return substitute(self.pool, self.unavailable, self.vendor_counts)
-
-    def note_retry(self, model):
-        """Count one retry for this model and return the new total."""
-        with self.lock:
-            self.rate_limited[model] += 1
-            return self.rate_limited[model]
 
     def another_than(self, model, already_tried):
         """A different model for THIS sample, without blacklisting `model`.
@@ -381,6 +374,8 @@ def generate_one(entry, model, models_state, api_key, args):
     model = models_state.still_usable(model)
     tried = []            # models that would not write this particular topic
     bad_responses = 0     # unusable answers for this sample, reset per model
+    rate_limit_waits = 0  # 429s seen while working on this sample
+    timeouts = 0          # consecutive timeouts from the current model
     text = ""
     while not text:
         if model is None:
@@ -393,23 +388,37 @@ def generate_one(entry, model, models_state, api_key, args):
             detail = error.read().decode("utf-8", "replace")[:200]
             if error.code in (401, 403) and "account" not in detail:
                 raise SystemExit(f"NIM rejected the API key ({error.code}): {detail}")
-            if error.code == 429 and models_state.note_retry(model) <= RATE_LIMIT_RETRIES:
-                # transient: the model works, we are just going too fast.
-                # Dropping it here would silently shrink the corpus's variety.
-                wait = RATE_LIMIT_BACKOFF * models_state.rate_limited[model]
+            if error.code == 429:
+                # Transient and nothing to do with this model: the account has
+                # a request-rate cap and we are hitting it. Counted per sample,
+                # because a lifetime counter would retire every model after a
+                # few busy minutes for a reason that is not its fault.
+                rate_limit_waits += 1
+                if rate_limit_waits > RATE_LIMIT_RETRIES:
+                    # let the whole account recover rather than blaming a model
+                    # that is answering perfectly well
+                    print(f"      429 for {model} again, backing off "
+                          f"{RATE_LIMIT_BACKOFF * 4}s")
+                    time.sleep(RATE_LIMIT_BACKOFF * 4)
+                    rate_limit_waits = 0
+                    continue
+                wait = RATE_LIMIT_BACKOFF * rate_limit_waits
                 print(f"      429 for {model}, waiting {wait}s and retrying")
                 time.sleep(wait)
                 continue
             print(f"      {error.code} for {model}, dropping it: {detail[:90]}")
             model = models_state.replacement_for(model)
         except TimeoutError:
-            # a cold or heavily loaded model can sit past the timeout; give it
-            # one more go, then move on rather than stalling the whole corpus
-            if models_state.note_retry(model) <= 1:
+            # A cold or heavily loaded model can sit past the timeout. One more
+            # go for this sample, then drop it: unlike a 429, a model that will
+            # not answer twice running really is unusable.
+            timeouts += 1
+            if timeouts <= 1:
                 print(f"      {model} timed out, retrying once")
                 continue
-            print(f"      {model} timed out again, dropping it")
+            print(f"      {model} timed out twice, dropping it")
             model = models_state.replacement_for(model)
+            timeouts = 0
         except urllib.error.URLError as error:
             if isinstance(error.reason, TimeoutError):
                 print(f"      {model} timed out, dropping it")
