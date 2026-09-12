@@ -28,7 +28,8 @@
 A command-line tool that reads a `.docx` or `.txt` and scores each paragraph
 0–1 on how AI-generated it reads, using the `desklib/ai-text-detector-v1.01`
 DeBERTa model — the one sitting at #1 on the RAID benchmark. Everything runs
-on your own machine; after the first model download it never touches the
+on your own machine; `aidetect download` fetches the model once and no other
+command ever touches the
 network. You point it at your Extended Essay, it tells you which paragraphs
 sound like a language model wrote them.
 
