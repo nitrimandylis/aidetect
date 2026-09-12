@@ -52,6 +52,12 @@ def main():
 
     if command != "download":
         os.environ.update(OFFLINE_ENV)
+    # a folder saved by `aidetect download <path>` becomes HF_HOME for every
+    # run; an HF_HOME already in the environment wins over it.
+    from .paths import saved_models_dir
+    saved = saved_models_dir()
+    if saved and "HF_HOME" not in os.environ:
+        os.environ["HF_HOME"] = saved
 
     module_name = COMMANDS[command][0]
     from importlib import import_module

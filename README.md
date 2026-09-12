@@ -72,6 +72,7 @@ uv tool install aidetect      # or: pipx install aidetect
 ```bash
 aidetect                                   # list the subcommands
 aidetect download                          # fetch the desklib model once (~1.5GB)
+aidetect download ~/models                 # same, into that folder, remembered for every run
 aidetect download --pair gemma --mlx       # plus the Gemma 4 pair for bino/check
 aidetect count "draft.docx" --limit 4000   # IB word count, by section
 aidetect count "draft.docx" --json         # same, as one JSON object
@@ -90,9 +91,11 @@ sets `HF_HUB_OFFLINE=1` before importing anything, so a run never phones home,
 not even the Hub's "is there a newer revision" check. A missing model exits
 with code 3 and tells you to download it.
 
-Models go where Hugging Face puts them, `$HF_HOME` (default
-`~/.cache/huggingface`). Set it before `download` and every later run to move
-them. The locally quantized MLX observer lives in `$AIDETECT_MLX_CACHE`
+Models go where Hugging Face puts them, `~/.cache/huggingface`, unless you
+hand `download` a folder: `aidetect download ~/models` fetches into it and
+writes the path to `~/.config/aidetect/models-dir`, which every later run
+picks up as `HF_HOME`. An `HF_HOME` already in your environment wins over the
+saved one. The locally quantized MLX observer lives in `$AIDETECT_MLX_CACHE`
 (default `~/.cache/ai-detect-mlx`).
 
 On Apple Silicon the Gemma 4 MLX pair installs automatically. Elsewhere it is
@@ -175,7 +178,7 @@ together and takes the worse verdict per sentence.
 | file | job |
 |---|---|
 | `src/aidetect/cli.py` | the `aidetect` entry point — dispatches subcommands, importing each lazily so `count` never loads torch, and sets `HF_HUB_OFFLINE` first for everything but `download` |
-| `src/aidetect/download.py` | the one command that talks to the network: fetches the desklib model and, on request, a Binoculars pair into `$HF_HOME` |
+| `src/aidetect/download.py` | the one command that talks to the network: fetches the desklib model and, on request, a Binoculars pair, into the folder you name or the Hugging Face default |
 | `src/aidetect/text.py` | shared, torch-free: `walk()` reads a `.docx`'s structure once, `is_prose()` is the detector's separate style filter, `sample_problem()` vets a generated calibration sample before it is saved |
 | `src/aidetect/count.py` | the IB word count — sections, rollup, citation stripping, budget |
 | `src/aidetect/detect.py` | loads the desklib model, scores each paragraph, prints the bars and flags |
@@ -185,7 +188,7 @@ together and takes the worse verdict per sentence.
 | `src/aidetect/binoculars.py` | training-free perplexity-ratio scorer over a base+instruct LM pair (Qwen, or Gemma 4 via `--mlx`; see below) |
 | `src/aidetect/calibrate.py` | fits a threshold on a labelled set you supply, saves it to `~/.config/aidetect` |
 | `src/aidetect/generate.py` | generates the AI half of a calibration set through NVIDIA NIM, with no system prompt and no style guidance, so the adversary stays fair |
-| `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package |
+| `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package — and where the models folder from `download <dir>` is remembered |
 | `src/aidetect/thresholds/` | the thresholds shipped with the package; a threshold you fit yourself wins over these |
 | `pyproject.toml` sdist excludes | `corpora`, `tests`, `tools` — `tests/fixtures/` holds the same essay excerpts as `corpora/`, so shipping the tests would redistribute what `corpora/` is withheld to protect |
 | `corpora/` | labelled calibration sets: `human`/`ai` (humanities) and `human-tech`/`ai-tech` (maths, science, ITGS). Repo-only, deliberately not shipped in the package, and **not covered by this repo's MIT licence** — see `corpora/README.md` |

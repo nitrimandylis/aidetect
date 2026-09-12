@@ -25,7 +25,7 @@ PYTHONPATH=src python -m aidetect.cli <subcommand> ...
 
 | command | cost | notes |
 |---|---|---|
-| `aidetect download [--pair gemma --mlx]` | **network, the only fetch**: ~1.5 GB for desklib, ~6 GB more plus a local quantization with the Gemma pair | run once before `score`, `bino` or `check`. Models land in `$HF_HOME` |
+| `aidetect download [dir] [--pair gemma --mlx]` | **network, the only fetch**: ~1.5 GB for desklib, ~6 GB more plus a local quantization with the Gemma pair | run once before `score`, `bino` or `check`. `dir` is optional; given, it is saved to `~/.config/aidetect/models-dir` and every later run uses it as `HF_HOME` |
 | `aidetect count <file.docx> [--limit N] [--json]` | instant, no model | the IB word count, by section and sub-section |
 | `aidetect extract <in.docx> [out.txt]` | instant, no model | writes the counted paragraphs out; defaults to `<name> prose.txt` beside the original |
 | `aidetect score <file>` | seconds, model from cache; exit 3 if not downloaded | desklib DeBERTa, higher = more AI-ish, flags >= 0.5 |
@@ -145,8 +145,9 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
   before suspecting the model.
 - **The MLX cache is `~/.cache/ai-detect-mlx`**, still the pre-rename name.
   Do not "fix" it: renaming forces a 6 GB re-download. `$AIDETECT_MLX_CACHE`
-  overrides it; `$HF_HOME` moves the Hugging Face models. Both must be set for
-  `download` and every later run alike.
+  overrides it. The Hugging Face models move with `aidetect download <dir>`,
+  which remembers the folder; an `HF_HOME` in the environment outranks the
+  remembered one.
 
 ## What this tool is for, and what it is not for
 

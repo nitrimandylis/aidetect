@@ -30,3 +30,20 @@ def threshold_path(tag):
 def ensure_user_dir():
     os.makedirs(USER_DIR, exist_ok=True)
     return USER_DIR
+
+
+MODELS_DIR_FILE = os.path.join(USER_DIR, "models-dir")
+
+
+def saved_models_dir():
+    """The folder `aidetect download <path>` saved, or None if none was."""
+    try:
+        return open(MODELS_DIR_FILE).read().strip() or None
+    except FileNotFoundError:
+        return None
+
+
+def save_models_dir(path):
+    ensure_user_dir()
+    with open(MODELS_DIR_FILE, "w") as f:
+        f.write(path + "\n")

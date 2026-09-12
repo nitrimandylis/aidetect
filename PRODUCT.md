@@ -19,8 +19,10 @@ uv tool install aidetect
 One command, eight subcommands. Subcommand modules import lazily, so the two
 that need no model stay instant.
 
-- `aidetect download` — the only command that fetches a model. Pulls the desklib
-  detector into `$HF_HOME`, and `--pair X [--mlx]` adds a Binoculars pair. Every
+- `aidetect download [dir]` — the only command that fetches a model. Pulls the
+  desklib detector, and `--pair X [--mlx]` adds a Binoculars pair. A `dir`
+  is remembered in `~/.config/aidetect/models-dir` and applied as `HF_HOME` on
+  every later run, so the folder is chosen once. Every
   other command runs with `HF_HUB_OFFLINE=1` set before any import and exits 3
   with a hint if a model is missing, so a cached model is never re-checked
   against the Hub and a run never phones home.
@@ -110,9 +112,11 @@ that need no model stay instant.
 - **The MLX cache stays at `~/.cache/ai-detect-mlx`** despite the rename.
   Moving it would force a 6GB re-download and re-quantization for nothing.
   `$AIDETECT_MLX_CACHE` overrides it for anyone who wants it elsewhere.
-- **Model folders are the Hugging Face ones, not a flag.** Issue #1 asked for a
-  choosable download folder. `$HF_HOME` already does that and the same setting
-  steers both `download` and the cache lookup, so no `--dir` was added.
+- **The models folder is chosen once, at download.** Issue #1 asked for a
+  choosable folder. Making it a positional on `download` and remembering it in
+  `~/.config/aidetect` means a run never needs `HF_HOME` exported by hand; an
+  exported `HF_HOME` still wins, so nothing Hugging Face users already do
+  breaks.
 
 ## Honest limits
 
