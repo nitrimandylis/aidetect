@@ -5,9 +5,9 @@ description: Drive the aidetect CLI — counts a draft the way the IB counts it 
 
 # aidetect
 
-One command, seven subcommands. Two are instant; four load a model and download
-gigabytes on their first run; one calls a hosted API over the network. Knowing
-which is which is most of what this skill is for.
+One command, eight subcommands. Two are instant; four load a model from the
+local cache and refuse to download; one fetches the models; one calls a hosted
+API over the network. Knowing which is which is most of what this skill is for.
 
 ## Setup
 
@@ -25,19 +25,21 @@ PYTHONPATH=src python -m aidetect.cli <subcommand> ...
 
 | command | cost | notes |
 |---|---|---|
+| `aidetect download [--pair gemma --mlx]` | **network, the only fetch**: ~1.5 GB for desklib, ~6 GB more plus a local quantization with the Gemma pair | run once before `score`, `bino` or `check`. Models land in `$HF_HOME` |
 | `aidetect count <file.docx> [--limit N] [--json]` | instant, no model | the IB word count, by section and sub-section |
 | `aidetect extract <in.docx> [out.txt]` | instant, no model | writes the counted paragraphs out; defaults to `<name> prose.txt` beside the original |
-| `aidetect score <file>` | **~1.5 GB download on first run**, then seconds | desklib DeBERTa, higher = more AI-ish, flags >= 0.5 |
+| `aidetect score <file>` | seconds, model from cache; exit 3 if not downloaded | desklib DeBERTa, higher = more AI-ish, flags >= 0.5 |
 | `aidetect score <file> --segments` | as `score` | overlapping 7-sentence windows; reports *% of prose in flagged segments*, the shape Turnitin reports |
-| `aidetect bino <file> --mlx --pair gemma` | **~6 GB download + a local quantization on first run** | Binoculars, **lower** = more AI-ish |
-| `aidetect check <file>` | loads **both** models, so both downloads | the combined verdict, worst opinion per sentence. Prefer this when the user wants one answer |
+| `aidetect bino <file> --mlx --pair gemma` | seconds per paragraph, model from cache; exit 3 if not downloaded | Binoculars, **lower** = more AI-ish |
+| `aidetect check <file>` | loads **both** models, so `download --pair gemma --mlx` first | the combined verdict, worst opinion per sentence. Prefer this when the user wants one answer |
 | `aidetect calibrate --human-dir D --ai-dir D` | as `bino`, plus ~0.55s per sample and ~0.87s per human window | refits the Binoculars threshold *and* the desklib amber band in one run. Measured on the M3 Pro: ~3.5 min for `corpora/human`, ~2 min for `corpora/human-tech`. Needs data that does not ship |
 | `aidetect generate --topics M --out-dir D` | **network; NIM's free tier, rate limited rather than metered** | builds an AI calibration corpus through NVIDIA NIM. Needs `NVIDIA_API_KEY` set by Nick. Pass `--append` when only new samples are wanted. Never run it unasked |
 
 **Default to `count`.** It answers the question the user usually has, costs
 nothing, and needs no network. Only reach for `score` or `bino` when the user
-actually asks about AI-detection, and say the download is coming before you
-start one.
+actually asks about AI-detection. If a model is missing the command exits 3 with
+a hint; run `aidetect download` (with `--pair gemma --mlx` for `bino`/`check`)
+and say the download is coming before you start it.
 
 ## Reading the count from a tool call
 
@@ -142,7 +144,9 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
   the package.** If Binoculars verdicts look wrong, check for a stale file there
   before suspecting the model.
 - **The MLX cache is `~/.cache/ai-detect-mlx`**, still the pre-rename name.
-  Do not "fix" it: renaming forces a 6 GB re-download.
+  Do not "fix" it: renaming forces a 6 GB re-download. `$AIDETECT_MLX_CACHE`
+  overrides it; `$HF_HOME` moves the Hugging Face models. Both must be set for
+  `download` and every later run alike.
 
 ## What this tool is for, and what it is not for
 
@@ -162,5 +166,7 @@ framing and offer the intended one.
 - It reads `.docx` and `.txt` only. No `.doc`, no PDF, no Google Docs export.
 - `count` implements the exclusions the EE and the subject IAs share. It does not
   know any subject's actual limit, so `--limit` has to come from the user.
-- It never touches the network after a model is cached — except `generate`,
-  which is an API client and exists only to build calibration corpora.
+- It never touches the network except in `download`, which fetches models, and
+  `generate`, which is an API client and exists only to build calibration
+  corpora. Every other command sets `HF_HUB_OFFLINE=1` before importing
+  anything, so a cached model is never re-checked against the Hub.

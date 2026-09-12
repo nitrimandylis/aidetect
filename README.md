@@ -174,7 +174,8 @@ together and takes the worse verdict per sentence.
 
 | file | job |
 |---|---|
-| `src/aidetect/cli.py` | the `aidetect` entry point — dispatches subcommands, importing each lazily so `count` never loads torch |
+| `src/aidetect/cli.py` | the `aidetect` entry point — dispatches subcommands, importing each lazily so `count` never loads torch, and sets `HF_HUB_OFFLINE` first for everything but `download` |
+| `src/aidetect/download.py` | the one command that talks to the network: fetches the desklib model and, on request, a Binoculars pair into `$HF_HOME` |
 | `src/aidetect/text.py` | shared, torch-free: `walk()` reads a `.docx`'s structure once, `is_prose()` is the detector's separate style filter, `sample_problem()` vets a generated calibration sample before it is saved |
 | `src/aidetect/count.py` | the IB word count — sections, rollup, citation stripping, budget |
 | `src/aidetect/detect.py` | loads the desklib model, scores each paragraph, prints the bars and flags |
@@ -193,7 +194,7 @@ together and takes the worse verdict per sentence.
 | `tools/run_ocr.sh`, `tools/ocr_all.sh` | render a scan to 200 dpi pages and OCR it, one essay or a whole folder |
 | `tools/build_corpus.py` | turns scanned Extended Essays into corpus samples: paragraphs rebuilt from line geometry, footnote superscripts stripped, three paragraphs picked per essay |
 | `tools/ocr_bias.py` | measures what OCR does to a score, on the same prose read both ways |
-| `tests/` | count rules, Binoculars math, segment windows, corpus stripping and calibration grouping, all self-checking, no model download |
+| `tests/` | count rules, Binoculars math, segment windows, corpus stripping, calibration grouping and the offline guard, all self-checking, no model download |
 | `tests/fixtures/known_clean/` | the 24 hand-picked samples that predate the OCR pipeline; the strip rules must never edit them |
 | `pyproject.toml` | package metadata and dependencies — torch · transformers · python-docx, plus mlx-vlm on Apple Silicon |
 

@@ -4,9 +4,9 @@ Local, offline AI-writing checks and IB word counts for my own drafts (EE, IA,
 etc). Tells me whether my prose reads as AI-generated *before* a teacher runs
 Turnitin, and whether the draft is over its word limit before I hand it in.
 
-Published to PyPI as `aidetect` (0.3.0, 2026-08-27) so it installs rather than
-being cloned. The source carries unreleased work on top of that tag, including
-the rebuilt corpora and the thresholds refitted on them. Releases go out from a GitHub release via trusted publishing:
+Published to PyPI as `aidetect` (0.4.0, 2026-08-27) so it installs rather than
+being cloned. The source carries 0.5.0 unreleased: the enforced offline mode and
+the `download` command, in answer to issue #1. Releases go out from a GitHub release via trusted publishing:
 `.github/workflows/publish.yml`, no token anywhere. To ship a version: bump
 `version` in pyproject.toml, then draft a release tagged `v<version>`.
 
@@ -16,8 +16,14 @@ uv tool install aidetect
 
 ## What it is
 
-One command, seven subcommands. Subcommand modules import lazily, so the three
+One command, eight subcommands. Subcommand modules import lazily, so the two
 that need no model stay instant.
+
+- `aidetect download` — the only command that fetches a model. Pulls the desklib
+  detector into `$HF_HOME`, and `--pair X [--mlx]` adds a Binoculars pair. Every
+  other command runs with `HF_HUB_OFFLINE=1` set before any import and exits 3
+  with a hint if a model is missing, so a cached model is never re-checked
+  against the Hub and a run never phones home.
 
 - `aidetect count` — the IB word count. Excludes the cover page, the contents
   page, headings, figure captions, tables, footnotes, in-text citations and
@@ -59,8 +65,8 @@ that need no model stay instant.
   and `--timeout` sets how long one may take. Every sample is validated by
   `sample_problem()` before it is written, on the same rules the human selector
   applies, and the model pool is swept up to three times before a sample is
-  given up on. The only subcommand that uses the network at run time, and the
-  only one needing a key (`NVIDIA_API_KEY`, read from the environment, never
+  given up on. Besides `download`, the only subcommand that uses the network at
+  run time, and the only one needing a key (`NVIDIA_API_KEY`, read from the environment, never
   stored).
 - `tools/` — repo-only, not shipped. `build_corpus.py` turns scanned Extended
   Essays into corpus samples through macOS Vision OCR, and `ocr_bias.py`
@@ -103,6 +109,10 @@ that need no model stay instant.
   import to count words, and the split is enforced by a check in `tests/`.
 - **The MLX cache stays at `~/.cache/ai-detect-mlx`** despite the rename.
   Moving it would force a 6GB re-download and re-quantization for nothing.
+  `$AIDETECT_MLX_CACHE` overrides it for anyone who wants it elsewhere.
+- **Model folders are the Hugging Face ones, not a flag.** Issue #1 asked for a
+  choosable download folder. `$HF_HOME` already does that and the same setting
+  steers both `download` and the cache lookup, so no `--dir` was added.
 
 ## Honest limits
 
