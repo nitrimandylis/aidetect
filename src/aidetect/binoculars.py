@@ -57,7 +57,7 @@ MLX_PAIRS = {
     "gemma":  ("google/gemma-4-E2B", "mlx-community/gemma-4-e2b-it-qat-OptiQ-4bit"),
     "gemma+": ("google/gemma-4-E4B", "mlx-community/gemma-4-e4b-it-qat-OptiQ-4bit"),
 }
-MLX_CACHE = os.path.expanduser("~/.cache/ai-detect-mlx")
+MLX_CACHE = os.path.expanduser(os.environ.get("AIDETECT_MLX_CACHE", "~/.cache/ai-detect-mlx"))
 MAX_LEN = 1024        # token window; longer paragraphs get truncated
 # ponytail: Falcon's tuned boundary as a placeholder. Wrong for our pair —
 # recalibrate on known-human text. Lower score = more AI-like.
@@ -142,7 +142,7 @@ def load_backend(args):
         tokenizer, observer, performer = load_pair_mlx(pair_key)
         return pair_key, "mlx", None, tokenizer, observer, performer
     device = pick_device()
-    print(f"loading {' + '.join(PAIRS[pair_key])} on {device}... (first run downloads the models)")
+    print(f"loading {' + '.join(PAIRS[pair_key])} on {device}...")
     tokenizer, observer, performer = load_pair(pair_key, device)
     return pair_key, "torch", device, tokenizer, observer, performer
 

@@ -6,9 +6,21 @@ pay a ~2s torch import to count words, and on a machine without mlx-vlm the
 torch-free subcommands still have to work.
 """
 
+import os
 import sys
 
+# Every command except `download` runs with the Hugging Face Hub switched off.
+# Without this, transformers and mlx-vlm phone home on every from_pretrained to
+# check for a newer revision, even when the model is fully cached. Set before
+# any import: huggingface_hub reads these once at import time.
+OFFLINE_ENV = {
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "HF_HUB_DISABLE_TELEMETRY": "1",
+}
+
 COMMANDS = {
+    "download":  ("aidetect.download",   "fetch the models once; every other command is offline"),
     "count":     ("aidetect.count",      "IB-rules word count for a draft"),
     "score":     ("aidetect.detect",     "score paragraphs with the desklib detector"),
     "check":     ("aidetect.check",      "run both detectors, worst opinion wins"),
@@ -38,10 +50,24 @@ def main():
         print(USAGE, end="", file=sys.stderr)
         return 2
 
+    if command != "download":
+        os.environ.update(OFFLINE_ENV)
+
     module_name = COMMANDS[command][0]
     from importlib import import_module
     module = import_module(module_name)
-    return module.main(sys.argv[2:])
+    try:
+        return module.main(sys.argv[2:])
+    except OSError as e:
+        # transformers wraps huggingface_hub's cache miss in an OSError whose
+        # message names offline mode; anything else is a real I/O error.
+        if "offline" not in str(e).lower():
+            raise
+        print("aidetect: a model is not in the local cache and aidetect never "
+              "downloads during a run.\nrun `aidetect download` once "
+              "(`aidetect download --help` for the Binoculars pairs).",
+              file=sys.stderr)
+        return 3
 
 
 if __name__ == "__main__":

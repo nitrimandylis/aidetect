@@ -2,8 +2,8 @@
 Local AI-writing detector for my drafts.
 
 Scores each paragraph of a .docx (or a .txt / --text string) with the
-desklib DeBERTa detector. Everything runs on my Mac, offline after the
-first model download. The score is a rough, directional read, NOT Turnitin:
+desklib DeBERTa detector. Everything runs on my Mac, offline: the model
+is fetched once by `aidetect download` and never during a run. The score is a rough, directional read, NOT Turnitin:
 high just means "this paragraph reads AI-ish, maybe reword it".
 
 Usage:
@@ -170,7 +170,7 @@ def main(argv=None):
         ap.error("give a file path or --text")
 
     device = pick_device()
-    print(f"loading {MODEL_ID} on {device}... (first run downloads ~1.5GB)")
+    print(f"loading {MODEL_ID} on {device}...")
     tokenizer, model = load_model(device)
 
     if args.segments:

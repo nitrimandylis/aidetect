@@ -56,7 +56,7 @@ reminder: directional only, not a Turnitin score.
 | 01 | **per-paragraph scoring** | what it actually catches — splits your draft and scores each paragraph, so you fix the two bad ones instead of rewriting everything |
 | 02 | **docx + txt input** | reads Word files through the same walker `count` uses — no cover page, no contents, no headings, no bibliography — or plain text split on blank lines |
 | 03 | **prose extractor** | `aidetect extract` dumps a draft's countable prose to a `.txt` so you can eyeball exactly what got counted |
-| 04 | **offline after setup** | first run pulls ~1.5GB of model, every run after is airgapped — your essay never leaves the laptop |
+| 04 | **offline, enforced** | `aidetect download` is the only command that touches the network; everything else runs with `HF_HUB_OFFLINE=1` and fails fast if a model is missing — your essay never leaves the laptop |
 | 05 | **optional third opinion** | [Ejhfast/fast-ai-detector], a separate lighter tool, for when both built-in detectors agree and you still want another read. Not part of any verdict |
 | 06 | **Binoculars (Gemma 4)** | a training-free perplexity-ratio detector — near chance with small Qwen pairs, but 92% on the labelled set once swapped to a Gemma 4 pair; see below |
 | 07 | **IB word count** | `aidetect count` (`--json` for scripts and agents) counts what the IB counts — no cover page, contents, headings, captions, tables, footnotes, citations or bibliography — and splits the total by section and sub-section, so an over-long draft tells you *where* |
@@ -70,7 +70,9 @@ uv tool install aidetect      # or: pipx install aidetect
 ```
 
 ```bash
-aidetect                                   # list the seven subcommands
+aidetect                                   # list the subcommands
+aidetect download                          # fetch the desklib model once (~1.5GB)
+aidetect download --pair gemma --mlx       # plus the Gemma 4 pair for bino/check
 aidetect count "draft.docx" --limit 4000   # IB word count, by section
 aidetect count "draft.docx" --json         # same, as one JSON object
 aidetect extract "draft.docx"              # -> "draft prose.txt", what got counted
@@ -83,8 +85,15 @@ aidetect check "draft.docx"                # both detectors, worst opinion wins
 
 `count` and `extract` are instant and need no model. `score` and `bino` need a
 machine that can hold a transformer: built and tested on an 18GB Apple Silicon
-Mac, MPS-accelerated. Their first run downloads the model and will sit there for
-a minute — that's normal, not a hang. Every run after is fast and offline.
+Mac, MPS-accelerated. Run `aidetect download` once first; every other command
+sets `HF_HUB_OFFLINE=1` before importing anything, so a run never phones home,
+not even the Hub's "is there a newer revision" check. A missing model exits
+with code 3 and tells you to download it.
+
+Models go where Hugging Face puts them, `$HF_HOME` (default
+`~/.cache/huggingface`). Set it before `download` and every later run to move
+them. The locally quantized MLX observer lives in `$AIDETECT_MLX_CACHE`
+(default `~/.cache/ai-detect-mlx`).
 
 On Apple Silicon the Gemma 4 MLX pair installs automatically. Elsewhere it is
 skipped and the Qwen pairs still work.
