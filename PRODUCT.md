@@ -4,9 +4,9 @@ Local, offline AI-writing checks and IB word counts for my own drafts (EE, IA,
 etc). Tells me whether my prose reads as AI-generated *before* a teacher runs
 Turnitin, and whether the draft is over its word limit before I hand it in.
 
-Published to PyPI as `aidetect` (0.4.0, 2026-08-27) so it installs rather than
-being cloned. The source carries 0.5.0 unreleased: the enforced offline mode and
-the `download` command, in answer to issue #1. Releases go out from a GitHub release via trusted publishing:
+Published to PyPI as `aidetect` so it installs rather than being cloned. 0.5.0
+(2026-09-12) added the enforced offline mode and the `download` command, in
+answer to issue #1; 0.5.1 (2026-10-03) is a docs refresh. Releases go out from a GitHub release via trusted publishing:
 `.github/workflows/publish.yml`, no token anywhere. To ship a version: bump
 `version` in pyproject.toml, then draft a release tagged `v<version>`.
 
