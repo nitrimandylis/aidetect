@@ -28,8 +28,9 @@
 A command-line tool that reads a `.docx` or `.txt` and scores each paragraph
 0–1 on how AI-generated it reads, using the `desklib/ai-text-detector-v1.01`
 DeBERTa model — the one sitting at #1 on the RAID benchmark. Everything runs
-on your own machine; `aidetect download` fetches the model once and no other
-command ever touches the network. You point it at your Extended Essay, it
+on your own machine; `aidetect download` fetches the model once, and the only
+other command that touches the network is `generate`, which builds calibration
+sets through NVIDIA NIM. Scoring never does. You point it at your Extended Essay, it
 tells you which paragraphs sound like a language model wrote them.
 
 The point isn't to cheat a detector. It's the opposite: I write my own drafts,
@@ -56,7 +57,7 @@ reminder: directional only, not a Turnitin score.
 | 01 | **per-paragraph scoring** | what it actually catches — splits your draft and scores each paragraph, so you fix the two bad ones instead of rewriting everything |
 | 02 | **docx + txt input** | reads Word files through the same walker `count` uses — no cover page, no contents, no headings, no bibliography — or plain text split on blank lines |
 | 03 | **prose extractor** | `aidetect extract` dumps a draft's countable prose to a `.txt` so you can eyeball exactly what got counted |
-| 04 | **offline, enforced** | `aidetect download` is the only command that touches the network; everything else runs with `HF_HUB_OFFLINE=1` and fails fast if a model is missing — your essay never leaves the laptop |
+| 04 | **offline, enforced** | `aidetect download` fetches models and `generate` calls NVIDIA NIM for calibration sets; they are the only commands that touch the network. Everything else runs with `HF_HUB_OFFLINE=1` and fails fast if a model is missing — your essay never leaves the laptop |
 | 05 | **optional third opinion** | [Ejhfast/fast-ai-detector], a separate lighter tool, for when both built-in detectors agree and you still want another read. Not part of any verdict |
 | 06 | **Binoculars (Gemma 4)** | a training-free perplexity-ratio detector — near chance with small Qwen pairs, but 92% on the labelled set once swapped to a Gemma 4 pair; see below |
 | 07 | **IB word count** | `aidetect count` (`--json` for scripts and agents) counts what the IB counts — no cover page, contents, headings, captions, tables, footnotes, citations or bibliography — and splits the total by section and sub-section, so an over-long draft tells you *where* |
@@ -77,12 +78,18 @@ aidetect download --pair gemma --mlx       # plus the Gemma 4 pair for bino/chec
 aidetect count "draft.docx" --limit 4000   # IB word count, by section
 aidetect count "draft.docx" --json         # same, as one JSON object
 aidetect extract "draft.docx"              # -> "draft prose.txt", what got counted
+aidetect extract "draft.docx" OUT.txt      # same, into a file you name
 aidetect score "draft.docx"                # score a whole draft, paragraph by paragraph
 aidetect score "draft.docx" --segments     # Turnitin-shaped: % of prose in flagged windows
 aidetect score --text "one sentence"       # score a single string
+aidetect score "draft.docx" --segments --tag tech   # judge against the tech-calibrated band
 aidetect bino  "draft.docx" --mlx --pair gemma
+aidetect bino  "draft.docx" --mlx --pair gemma --tag tech --threshold 0.8   # genre tag, or your own cut-off
 aidetect check "draft.docx"                # both detectors, worst opinion wins
+aidetect check "draft.docx" --pair gemma --no-mlx --tag tech   # --pair, --mlx/--no-mlx and --tag
 ```
+
+`bino` defaults to the `small` pair and `--mlx` is off unless you pass it; `check` defaults to the `gemma` pair and turns `--mlx` on for Apple Silicon. `--threshold` overrides the calibrated cut-off, and `--tag` picks the thresholds calibrated with the same tag.
 
 `count` and `extract` are instant and need no model. `score` and `bino` need a
 machine that can hold a transformer: built and tested on an 18GB Apple Silicon
@@ -178,7 +185,7 @@ together and takes the worse verdict per sentence.
 | file | job |
 |---|---|
 | `src/aidetect/cli.py` | the `aidetect` entry point — dispatches subcommands, importing each lazily so `count` never loads torch, and sets `HF_HUB_OFFLINE` first for everything but `download` |
-| `src/aidetect/download.py` | the one command that talks to the network: fetches the desklib model and, on request, a Binoculars pair, into the folder you name or the Hugging Face default |
+| `src/aidetect/download.py` | the command that fetches models: the desklib model and, on request, a Binoculars pair, into the folder you name or the Hugging Face default |
 | `src/aidetect/text.py` | shared, torch-free: `walk()` reads a `.docx`'s structure once, `is_prose()` is the detector's separate style filter, `sample_problem()` vets a generated calibration sample before it is saved |
 | `src/aidetect/count.py` | the IB word count — sections, rollup, citation stripping, budget |
 | `src/aidetect/detect.py` | loads the desklib model, scores each paragraph, prints the bars and flags |
@@ -190,7 +197,7 @@ together and takes the worse verdict per sentence.
 | `src/aidetect/generate.py` | generates the AI half of a calibration set through NVIDIA NIM, with no system prompt and no style guidance, so the adversary stays fair |
 | `src/aidetect/paths.py` | where thresholds are looked up — `~/.config/aidetect` first, then the ones in the package — and where the models folder from `download <dir>` is remembered |
 | `src/aidetect/thresholds/` | the thresholds shipped with the package; a threshold you fit yourself wins over these |
-| `pyproject.toml` sdist excludes | `corpora`, `tests`, `tools` — `tests/fixtures/` holds the same essay excerpts as `corpora/`, so shipping the tests would redistribute what `corpora/` is withheld to protect |
+| `pyproject.toml` sdist excludes | `corpora`, `tests`, `tools`, `*-clean.txt` (my own drafts) and `fast-ai-detector` — `tests/fixtures/` holds the same essay excerpts as `corpora/`, so shipping the tests would redistribute what `corpora/` is withheld to protect |
 | `corpora/` | labelled calibration sets: `human`/`ai` (humanities) and `human-tech`/`ai-tech` (maths, science, ITGS). Repo-only, deliberately not shipped in the package, and **not covered by this repo's MIT licence** — see `corpora/README.md` |
 | `tools/fetch_exemplars.sh` | downloads the 48 IBO exemplars from the Wayback Machine |
 | `tools/ocr.swift` | macOS Vision OCR for one page image; prints text plus line geometry as TSV. Compiled on demand by `run_ocr.sh`, never committed |
@@ -239,6 +246,9 @@ aidetect bino IA-clean.txt --mlx --pair gemma   # uses the shipped threshold
 
 # refit the threshold on your own labelled set
 aidetect calibrate --human-dir corpora/human --ai-dir corpora/ai --mlx --pair gemma
+
+# ...and score a draft with the new threshold in the same run
+aidetect calibrate --human-dir corpora/human --ai-dir corpora/ai --mlx --pair gemma --check draft.txt
 ```
 
 ### The AI class has to be a fair adversary
@@ -252,6 +262,8 @@ export NVIDIA_API_KEY=nvapi-...     # you set it; aidetect only reads the env va
 aidetect generate --topics corpora/human-tech/manifest.json \
                   --out-dir corpora/ai-tech --prefix ta --seed 7
 ```
+
+`--words N` sets the target length of each paragraph (default 110).
 
 By default it reads NIM's live catalog and **samples popular models across
 vendors**, one per topic, so the class carries a spread of tokenizers,

@@ -32,8 +32,8 @@ PYTHONPATH=src python -m aidetect.cli <subcommand> ...
 | `aidetect score <file> --segments` | as `score` | overlapping 7-sentence windows; reports *% of prose in flagged segments*, the shape Turnitin reports |
 | `aidetect bino <file> --mlx --pair gemma` | seconds per paragraph, model from cache; exit 3 if not downloaded | Binoculars, **lower** = more AI-ish |
 | `aidetect check <file>` | loads **both** models, so `download --pair gemma --mlx` first | the combined verdict, worst opinion per sentence. Prefer this when the user wants one answer |
-| `aidetect calibrate --human-dir D --ai-dir D` | as `bino`, plus ~0.55s per sample and ~0.87s per human window | refits the Binoculars threshold *and* the desklib amber band in one run. Measured on the M3 Pro: ~3.5 min for `corpora/human`, ~2 min for `corpora/human-tech`. Needs data that does not ship |
-| `aidetect generate --topics M --out-dir D` | **network; NIM's free tier, rate limited rather than metered** | builds an AI calibration corpus through NVIDIA NIM. Needs `NVIDIA_API_KEY` set by Nick. Pass `--append` when only new samples are wanted. Never run it unasked |
+| `aidetect calibrate --human-dir D --ai-dir D` | as `bino`, plus ~0.55s per sample and ~0.87s per human window | refits the Binoculars threshold *and* the desklib amber band in one run. Measured on an Apple Silicon laptop: ~3.5 min for `corpora/human`, ~2 min for `corpora/human-tech`. Needs data that does not ship |
+| `aidetect generate --topics M --out-dir D` | **network; NIM's free tier, rate limited rather than metered** | builds an AI calibration corpus through NVIDIA NIM. Needs `NVIDIA_API_KEY` set by the user. Pass `--append` when only new samples are wanted. Never run it unasked |
 
 **Default to `count`.** It answers the question the user usually has, costs
 nothing, and needs no network. Only reach for `score` or `bino` when the user
@@ -71,7 +71,7 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
   a Binoculars score as if high were bad inverts the verdict.
 - **`bino`'s default pair is near-chance and must not be used.** `--pair small`
   separates the calibration set at 62%, `big` at 67%. Only `--mlx --pair gemma`
-  (92%) is worth reporting. On this Mac always pass both flags.
+  (92%) is worth reporting. On Apple Silicon always pass both flags.
 - **Score a maths, CS or science draft with `--tag tech`.** Human *technical*
   prose scores a little lower on Binoculars than humanities prose (mean 0.89
   against 0.91), and the tech threshold is fitted on verified technical essays,
@@ -84,8 +84,8 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
   default, which made the default look like it sat at the technical human mean
   and flagged half of any maths or CS draft. Refitted on 51 technical and 93
   humanities paragraphs the gap is 0.026 and the tech threshold (0.802) sits
-  slightly *above* the default (0.784). The old flag-rate numbers for Nick's own
-  drafts (maths IA 28% to 13%, CS IA 51% to 32%) were measured with the old
+  slightly *above* the default (0.784). The old flag-rate numbers for the author's own
+  drafts (a maths IA 28% to 13%, a CS IA 51% to 32%) were measured with the old
   thresholds and have not been re-measured. Do not quote them as current.
 - **`--pair gemma+` (E4B) is not worth the download.** It was calibrated and tied
   E2B at 92% while being far larger, and the package ships no E4B threshold, so
@@ -93,7 +93,7 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
   its flags mean nothing. Stay on `--pair gemma`.
 - **`count` and `extract` take a `.docx` only.** Both error on `.txt`, because a
   text file has no styles, and styles are how they find headings and therefore
-  sections. `score` and `bino` are the two that accept `.txt`.
+  sections. `score`, `bino` and `check` accept `.txt`.
 - **Block quotes and body bullet lists count.** They are assessed prose. What
   `count` drops, it drops by *position*: everything before the first heading
   (the cover page), the Table of Contents section, headings themselves,
@@ -151,7 +151,7 @@ No other subcommand has `--json` yet; `score` and `bino` still print for humans.
 
 ## What this tool is for, and what it is not for
 
-It exists so Nick can find his own honest prose that trips classifiers, and
+It exists so a writer can find their own honest prose that trips classifiers, and
 reword it before a teacher runs Turnitin. Report findings as "this paragraph
 reads AI-ish, consider rewording".
 

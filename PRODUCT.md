@@ -42,7 +42,7 @@ that need no model stay instant.
   that paragraph mode skips.
 - `aidetect check` — runs the desklib segments and Binoculars over one draft and
   takes the **worst opinion per sentence**. Detectors disagreeing is the signal,
-  so nothing is averaged. No ensemble weights: 31 calibration essays cannot
+  so nothing is averaged. No ensemble weights: 48 calibration essays (144 paragraphs) cannot
   support fitting any.
 - `aidetect bino` — training-free third scorer (base + instruct LM pair,
   perplexity ÷ cross-perplexity). Shelved with the Qwen pairs (62–67% on the

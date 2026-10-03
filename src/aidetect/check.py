@@ -7,15 +7,15 @@ exactly the disagreement worth seeing — a region only one detector dislikes is
 a region a third, differently-tuned detector (the one the teacher runs) might
 dislike too.
 
-There are no ensemble weights and never will be: the calibration set is 24
-documents, which cannot support fitting any. The combination rule stays one
+There are no ensemble weights and never will be: the calibration set is 144
+paragraphs from 48 essays, which cannot support fitting any. The combination rule stays one
 sentence: worst opinion wins.
 
     aidetect check draft.docx
     aidetect check draft.docx --pair gemma+ --no-mlx
 
 Defaults to the gemma pair via MLX on Apple Silicon, because that is the only
-pair that has ever separated the calibration set (~96%); everywhere else it
+pair that has ever separated the calibration set (91.9%, leave-one-essay-out); everywhere else it
 falls back to the torch backend.
 """
 
