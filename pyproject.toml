@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aidetect"
-version = "0.5.1"
+version = "0.5.2"
 description = "Local, offline AI-writing detector and IB word counter for your own drafts"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 authors = [{ name = "Nikolas Trimandylis" }]
 keywords = ["ai-detection", "binoculars", "ib", "word-count", "docx"]
