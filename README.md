@@ -19,6 +19,8 @@
 ![license](https://img.shields.io/badge/license-MIT-2ea043?style=flat-square&labelColor=111111)
 ![telemetry](https://img.shields.io/badge/telemetry-0_(it's_your_essay)-111111?style=flat-square&labelColor=111111)
 
+![aidetect](.github/assets/aidetect.gif)
+
 </div>
 
 ---

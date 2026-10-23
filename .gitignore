@@ -23,3 +23,6 @@ uv.lock
 
 # compiled by tools/run_ocr.sh from ocr.swift, never committed
 tools/ocr
+
+# vhs demo fixtures, built by tapes/fixture.py
+tapes/fixtures/
