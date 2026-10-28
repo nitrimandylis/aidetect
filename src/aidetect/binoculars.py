@@ -102,12 +102,48 @@ def load_pair(pair_key, device):
 def _mlx_quantized(repo):
     """Return a local 4-bit MLX copy of an fp16 HF repo, converting once and reusing.
     Gemma 4 ships as a VLM checkpoint, so this goes through mlx-vlm, not mlx-lm."""
+    import shutil
+    import tempfile
     from mlx_vlm import convert
+    from mlx_vlm.utils import get_model_path
     out = os.path.join(MLX_CACHE, repo.replace("/", "_") + "-4bit")
-    if not os.path.isdir(out):
-        print(f"converting {repo} to 4-bit MLX (one-time, downloads fp16 weights)...")
-        convert(repo, mlx_path=out, quantize=True)
+    if os.path.isdir(out) and _is_quantized(out):
+        return out
+    if os.path.isdir(out):
+        # Left behind by a crashed conversion: weights but no quantization
+        # config, so loading it fails on missing .scales/.biases.
+        print(f"removing incomplete conversion {out}")
+        shutil.rmtree(out)
+    print(f"converting {repo} to 4-bit MLX (one-time, downloads fp16 weights)...")
+    src = get_model_path(repo)
+    partial = out + ".partial"
+    shutil.rmtree(partial, ignore_errors=True)
+    os.makedirs(MLX_CACHE, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=MLX_CACHE) as shadow:
+        # The HF cache can hold read-only blobs. convert() copies *.json/*.py
+        # with their mode, then save_pretrained overwrites its own copy of
+        # tokenizer.json and hits "Permission denied". So convert from a
+        # shadow dir: writable copies of the small files, symlinks to the rest.
+        for name in os.listdir(src):
+            path = os.path.join(src, name)
+            if name.endswith((".json", ".py")):
+                shutil.copyfile(path, os.path.join(shadow, name))
+            else:
+                os.symlink(os.path.realpath(path), os.path.join(shadow, name))
+        convert(shadow, mlx_path=partial, quantize=True)
+    # Only a finished conversion ever appears at `out`.
+    os.rename(partial, out)
     return out
+
+
+def _is_quantized(path):
+    """True if a converted dir finished: convert() writes the quantization
+    block into config.json as its last step."""
+    import json
+    try:
+        return "quantization" in json.load(open(os.path.join(path, "config.json")))
+    except (OSError, ValueError):
+        return False
 
 
 def load_pair_mlx(pair_key):

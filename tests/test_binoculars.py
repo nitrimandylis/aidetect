@@ -59,6 +59,52 @@ def test_pick_threshold_reports_partial_accuracy_when_overlapping():
     assert acc < 1.0             # can't perfectly separate
 
 
+def test_mlx_convert_survives_readonly_source_and_redoes_partial():
+    # Fake mlx_vlm whose convert() behaves like the real one: copies *.json
+    # keeping the mode, then overwrites its own tokenizer.json, then writes
+    # the quantization config last.
+    import json, shutil, stat, tempfile, types
+    from aidetect import binoculars
+
+    tmp = tempfile.mkdtemp()
+    src = os.path.join(tmp, "hf")
+    os.makedirs(src)
+    for name in ("tokenizer.json", "config.json", "model.safetensors"):
+        with open(os.path.join(src, name), "w") as f:
+            f.write("{}")
+        os.chmod(os.path.join(src, name), stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+
+    def convert(hf_path, mlx_path, quantize):
+        os.makedirs(mlx_path)
+        for name in os.listdir(hf_path):
+            shutil.copy(os.path.join(hf_path, name), mlx_path)
+        with open(os.path.join(mlx_path, "tokenizer.json"), "w") as f:
+            f.write("{}")   # raises PermissionError if the copy is read-only
+        os.chmod(os.path.join(mlx_path, "config.json"), stat.S_IRWXU)
+        with open(os.path.join(mlx_path, "config.json"), "w") as f:
+            json.dump({"quantization": {"bits": 4}}, f)
+
+    fake = types.ModuleType("mlx_vlm")
+    fake.convert = convert
+    fake.utils = types.ModuleType("mlx_vlm.utils")
+    fake.utils.get_model_path = lambda repo: src
+    sys.modules["mlx_vlm"] = fake
+    sys.modules["mlx_vlm.utils"] = fake.utils
+    binoculars.MLX_CACHE = os.path.join(tmp, "cache")
+
+    # a crashed earlier run: weights, but no quantization key
+    stale = os.path.join(binoculars.MLX_CACHE, "org_model-4bit")
+    os.makedirs(stale)
+    with open(os.path.join(stale, "config.json"), "w") as f:
+        json.dump({}, f)
+
+    out = binoculars._mlx_quantized("org/model")
+    assert out == stale
+    assert binoculars._is_quantized(out)
+    assert not os.path.exists(out + ".partial")
+    assert sorted(os.listdir(binoculars.MLX_CACHE)) == ["org_model-4bit"]   # shadow dir gone
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
